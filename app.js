@@ -86,11 +86,7 @@ async function loadDashLive() {
   if (!(ME.role === 'admin' || ME.role === 'approver')) return;
   try { statsData = await api('/api/stats'); } catch (e) { return; }
   [['kPend', statsData.pending], ['kApp', statsData.approvedToday], ['kIn', statsData.enteredToday], ['kFail', statsData.failedToday]].forEach(([id, n]) => { const el = document.getElementById(id); if (el) { el.dataset.count = n; countUp(el); } });
-  try {
-    const d = await api('/api/logs?page=1&size=6'), el = $('#feed'); if (!el) return;
-    const ago = ts => { const m = Math.max(0, Math.round((Date.now() - new Date(ts)) / 60000)); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
-    el.innerHTML = d.items.length ? d.items.map((r, i) => { const e = EV[r.action] || [r.action, '']; return `<li style="--i:${i}"><span class="dot ${e[1]}"></span><div><b>${esc(e[0])}</b><small>${esc([r.actor || r.email, r.toolName].filter(Boolean).join(' · ') || '—')}</small></div><time>${esc(ago(r.ts))}</time></li>`; }).join('') : '<li class="none">Nothing has happened yet.</li>';
-  } catch (e) { }
+
 }
 function renderDashboard() {
   clearInterval(heroTimer); clearInterval(clockTimer);
@@ -115,10 +111,7 @@ function renderDashboard() {
     <div class="sect"><h2>Your tools</h2><span class="muted">Each one opens in a new tab.</span></div>
     ${tools.length ? `<div class="grid">${tools.map((t, i) => card(t).replace('<article class="card"', `<article class="card rise" style="--i:${i}"`).replace(/<span class="status([^"]*)"><i><\/i>(Active|Coming soon)<\/span>/, (m, c, w) => w === 'Active' ? `<span class="status" data-st="${esc(t.id)}"><i></i>Checking…</span>` : m)).join('')}</div>`
       : `<div class="empty">${!myTools().length ? 'You have no tools yet.' : 'No tools match your search.'}</div>`}
-    <div class="duo">
-      ${appr ? `<section class="panel rise" style="--i:3"><div class="sect s2"><h2>Recent activity</h2><a href="/settings/activity">See all</a></div><ul class="feed" id="feed"><li class="none">Loading…</li></ul></section>` : ''}
-      <section class="panel rise${appr ? '' : ' wide'}" style="--i:4"><div class="sect s2"><h2>Our work</h2></div><div class="gal">${PHOTOS.map(n => `<figure style="--i:${n}"><img loading="lazy" src="/signin-${n}.jpg" alt="ARC project ${n}"></figure>`).join('')}</div></section>
-    </div>`;
+`;
   $('#view').querySelectorAll('[data-fav]').forEach(b => b.onclick = () => { const id = b.dataset.fav; favs = isFav(id) ? favs.filter(x => x !== id) : [...favs, id]; saveFavs(); b.classList.toggle('on', isFav(id)); });
   const tick = () => { const n = new Date(), c = $('#hClock'); if (!c) return; c.textContent = n.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); $('#hDate').textContent = n.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }); };
   tick(); clockTimer = setInterval(() => { if (!$('#hClock')) return clearInterval(clockTimer); tick(); }, 15000);
@@ -303,7 +296,7 @@ async function loadRequests() {
 /* ---------- Settings: General + Activity log ---------- */
 function routeParts() { return location.pathname.replace(/^\/+|\/+$/g, '').split('/'); }
 const isActivity = () => routeParts()[0] === 'settings' && routeParts()[1] === 'activity';
-const onLive = () => { if (isReqPage()) loadRequests(); if (isActivity()) loadLogs(); if ($('#feed')) { loadDashLive(); const h = $('#hPend'); if (h) h.textContent = pendingCount ? pendingCount + ' waiting for approval' : 'No requests waiting'; } };
+const onLive = () => { if (isReqPage()) loadRequests(); if (isActivity()) loadLogs(); if ($('#kTools')) { loadDashLive(); const h = $('#hPend'); if (h) h.textContent = pendingCount ? pendingCount + ' waiting for approval' : 'No requests waiting'; } };
 const lg = { page: 1, q: '', action: '' };
 const EV = {
   'request.created': ['Request received', ''], 'request.approved': ['Approved', 'ok'], 'request.denied': ['Declined', ''], 'request.revoked': ['Access revoked', 'bad'],
