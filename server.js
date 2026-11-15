@@ -290,6 +290,28 @@ app.get('/api/access', approver, needDb, async (req, res) => {          // ?view
   res.json({ items: rows.map(accessPub), total, page, pages, size });
 });
 
+/* ---- live tool status (public: green/red dots on the dashboard) ---- */
+let statusCache = { ts: 0, data: [] };
+app.get('/api/status', async (req, res) => {
+  if (Date.now() - statusCache.ts < 15000) return res.json(statusCache.data);
+  const data = await Promise.all(loadTools().filter(t => t.url).map(async t => {
+    const t0 = Date.now(), ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 4000);
+    try { const r = await fetch(t.url.replace(/\/$/, '') + '/api/health', { signal: ctl.signal }); return { id: t.id, up: r.ok, ms: Date.now() - t0 }; }
+    catch (e) { return { id: t.id, up: false, ms: null }; } finally { clearTimeout(to); }
+  }));
+  statusCache = { ts: Date.now(), data }; res.json(data);
+});
+/* ---- dashboard numbers for approvers ---- */
+app.get('/api/stats', approver, needDb, async (req, res) => {
+  const n = async sql => (await pool.query(sql)).rows[0].n;
+  const day = "ts > now() - interval '24 hours'";
+  res.json({
+    pending: await n("SELECT count(*)::int AS n FROM gw_access WHERE status = 'pending'"),
+    approvedToday: await n("SELECT count(*)::int AS n FROM gw_log WHERE action = 'request.approved' AND " + day),
+    enteredToday: await n("SELECT count(*)::int AS n FROM gw_log WHERE action IN ('visitor.entered','gateway.link_entry','owner.signin') AND " + day),
+    failedToday: await n("SELECT count(*)::int AS n FROM gw_log WHERE action IN ('owner.signin_failed','gateway.signin_failed') AND " + day)
+  });
+});
 /* ---- Activity log (approvers): ?page=1&size=20&q=text&action=request.approved ---- */
 function logQuery(req) {
   const conds = [], params = [];

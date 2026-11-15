@@ -62,6 +62,71 @@ function renderTools(mine) {
   });
 }
 
+/* ---------- Dashboard: hero, live numbers, tools, activity, gallery ---------- */
+const PHOTOS = [1, 2, 3, 4, 5];
+let heroTimer = null, clockTimer = null, statusData = [], statsData = null;
+const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function greeting() { const h = new Date().getHours(); return h < 5 ? 'Working late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; }
+function countUp(el) {
+  const to = +el.dataset.count || 0; if (reduced() || to === 0) { el.textContent = to; return; }
+  const t0 = performance.now(), dur = 900;
+  const step = n => { const p = Math.min(1, (n - t0) / dur); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+function paintStatus() {
+  document.querySelectorAll('[data-st]').forEach(el => {
+    const s = statusData.find(x => x.id === el.dataset.st); if (!s) return;
+    el.classList.toggle('down', !s.up); el.lastChild.textContent = s.up ? 'Online' : 'Offline';
+  });
+  const up = statusData.filter(x => x.up).length, k = $('#kTools');
+  if (k && statusData.length) { k.dataset.count = up; k.parentNode.querySelector('small').textContent = 'of ' + statusData.length + ' tools online'; countUp(k); }
+}
+async function loadDashLive() {
+  try { statusData = await api('/api/status'); paintStatus(); } catch (e) { }
+  if (!(ME.role === 'admin' || ME.role === 'approver')) return;
+  try { statsData = await api('/api/stats'); } catch (e) { return; }
+  [['kPend', statsData.pending], ['kApp', statsData.approvedToday], ['kIn', statsData.enteredToday], ['kFail', statsData.failedToday]].forEach(([id, n]) => { const el = document.getElementById(id); if (el) { el.dataset.count = n; countUp(el); } });
+  try {
+    const d = await api('/api/logs?page=1&size=6'), el = $('#feed'); if (!el) return;
+    const ago = ts => { const m = Math.max(0, Math.round((Date.now() - new Date(ts)) / 60000)); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
+    el.innerHTML = d.items.length ? d.items.map((r, i) => { const e = EV[r.action] || [r.action, '']; return `<li style="--i:${i}"><span class="dot ${e[1]}"></span><div><b>${esc(e[0])}</b><small>${esc([r.actor || r.email, r.toolName].filter(Boolean).join(' · ') || '—')}</small></div><time>${esc(ago(r.ts))}</time></li>`; }).join('') : '<li class="none">Nothing has happened yet.</li>';
+  } catch (e) { }
+}
+function renderDashboard() {
+  clearInterval(heroTimer); clearInterval(clockTimer);
+  const appr = ME.role === 'admin' || ME.role === 'approver', tools = myTools().filter(match);
+  const first = ME.signedIn && ME.role !== 'approver' ? ME.name.split(' ')[0] : '';
+  const kpi = (id, label, sub, n, cls) => `<div class="kpi ${cls || ''}"><div class="kv" id="${id}" data-count="${n}">0</div><div class="kl">${label}</div><small>${sub}</small></div>`;
+  $('#view').innerHTML = `
+    <section class="hero">
+      <div class="hero-bg">${PHOTOS.map((n, i) => `<i class="${i === 0 ? 'on' : ''}" style="background-image:url(/signin-${n}.jpg)"></i>`).join('')}</div>
+      <div class="hero-in">
+        <div class="hero-clock"><b id="hClock"></b><span id="hDate"></span></div>
+        <h1>${greeting()}${first ? ', ' + esc(first) : ''}.</h1>
+        <p>Everything ARC Design &amp; Construction Services runs on, in one place.</p>
+        <div class="hero-act">${myTools().filter(t => t.url).map(t => `<a class="open" href="/launch/${esc(t.id)}" target="_blank" rel="noopener">${esc(t.name)} ${svg('open')}</a>`).join('')}
+        ${appr ? `<a class="ghost" href="#requests"><i class="ping"></i><span id="hPend">${pendingCount ? pendingCount + ' waiting for approval' : 'No requests waiting'}</span></a>` : ''}</div>
+      </div>
+    </section>
+    <div class="kpis">
+      ${kpi('kTools', 'Tools', 'checking…', 0)}
+      ${appr ? kpi('kPend', 'Waiting', 'requests to review', 0, 'warm') + kpi('kApp', 'Approved', 'in the last 24 h', 0) + kpi('kIn', 'Entries', 'in the last 24 h', 0) + kpi('kFail', 'Failed sign-ins', 'in the last 24 h', 0, 'bad') : ''}
+    </div>
+    <div class="sect"><h2>Your tools</h2><span class="muted">Each one opens in a new tab.</span></div>
+    ${tools.length ? `<div class="grid">${tools.map((t, i) => card(t).replace('<article class="card"', `<article class="card rise" style="--i:${i}"`).replace(/<span class="status([^"]*)"><i><\/i>(Active|Coming soon)<\/span>/, (m, c, w) => w === 'Active' ? `<span class="status" data-st="${esc(t.id)}"><i></i>Checking…</span>` : m)).join('')}</div>`
+      : `<div class="empty">${!myTools().length ? 'You have no tools yet.' : 'No tools match your search.'}</div>`}
+    <div class="duo">
+      ${appr ? `<section class="panel rise" style="--i:3"><div class="sect s2"><h2>Recent activity</h2><a href="#settings/activity">See all</a></div><ul class="feed" id="feed"><li class="none">Loading…</li></ul></section>` : ''}
+      <section class="panel rise${appr ? '' : ' wide'}" style="--i:4"><div class="sect s2"><h2>Our work</h2></div><div class="gal">${PHOTOS.map(n => `<figure style="--i:${n}"><img loading="lazy" src="/signin-${n}.jpg" alt="ARC project ${n}"></figure>`).join('')}</div></section>
+    </div>`;
+  $('#view').querySelectorAll('[data-fav]').forEach(b => b.onclick = () => { const id = b.dataset.fav; favs = isFav(id) ? favs.filter(x => x !== id) : [...favs, id]; saveFavs(); b.classList.toggle('on', isFav(id)); });
+  const tick = () => { const n = new Date(), c = $('#hClock'); if (!c) return; c.textContent = n.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); $('#hDate').textContent = n.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }); };
+  tick(); clockTimer = setInterval(() => { if (!$('#hClock')) return clearInterval(clockTimer); tick(); }, 15000);
+  const bg = [...document.querySelectorAll('.hero-bg i')]; let k = 0;
+  if (!reduced()) heroTimer = setInterval(() => { if (!$('.hero-bg')) return clearInterval(heroTimer); bg[k].classList.remove('on'); k = (k + 1) % bg.length; bg[k].classList.add('on'); }, 6000);
+  document.querySelectorAll('.kv').forEach(el => { if (el.id === 'kTools') el.textContent = '–'; });
+  loadDashLive();
+}
 /* ---------- Admin Console ---------- */
 async function renderAdmin() {
   $('#view').innerHTML = `<div class="row"><div><h1>Admin Console</h1><p class="sub">Create users and choose which tools each person can open.</p></div><span class="spacer"></span><button class="open sm" id="addU">Add user</button></div><div id="uList"><div class="empty">Loading…</div></div>`;
@@ -238,7 +303,7 @@ async function loadRequests() {
 /* ---------- Settings: General + Activity log ---------- */
 const routeParts = () => (location.hash.slice(1) || '').split('/');
 const isActivity = () => routeParts()[0] === 'settings' && routeParts()[1] === 'activity';
-const onLive = () => { if (isReqPage()) loadRequests(); if (isActivity()) loadLogs(); };
+const onLive = () => { if (isReqPage()) loadRequests(); if (isActivity()) loadLogs(); if ($('#feed')) { loadDashLive(); const h = $('#hPend'); if (h) h.textContent = pendingCount ? pendingCount + ' waiting for approval' : 'No requests waiting'; } };
 const lg = { page: 1, q: '', action: '' };
 const EV = {
   'request.created': ['Request received', ''], 'request.approved': ['Approved', 'ok'], 'request.denied': ['Declined', ''], 'request.revoked': ['Access revoked', 'bad'],
@@ -325,7 +390,7 @@ function paintNav(route) {
   const r = (route === 'admin' && ME.role !== 'admin') || ((route === 'requests' || route === 'settings') && !isAppr) ? 'dashboard' : route;
   paintNav(r);
   $('#crumbSub').textContent = { admin: 'Admin console', requests: 'Access requests', settings: 'Settings', mytools: 'My tools' }[r] || 'Internal portal';
-  if (r === 'admin') renderAdmin(); else if (r === 'requests') renderRequests(); else if (r === 'settings') renderSettings(); else renderTools(r === 'mytools');
+  if (r === 'admin') renderAdmin(); else if (r === 'requests') renderRequests(); else if (r === 'settings') renderSettings(); else if (r === 'mytools') renderTools(true); else renderDashboard();
 }
 addEventListener('hashchange', () => { document.documentElement.classList.remove('navopen'); if (ME) render(); });
 $('#q').oninput = e => { query = e.target.value; if (ME && !/^#(admin|requests|settings)/.test(location.hash)) render(); };
