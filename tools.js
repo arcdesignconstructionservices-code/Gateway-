@@ -22,7 +22,7 @@ const GATEWAY_TOOLS = [
     name: 'ARC+ Inventory Tool',
     desc: 'Tools and materials: QR labels and scanning, check-out / check-in, stock changes, alerts and history.',
     group: 'Operations',
-    url: 'https://inventory-production-095f388b.up.railway.app',
+    url: 'https://inventory.arcdesignconstructions.com',
     icon: 'inventory'
   }
 ];
