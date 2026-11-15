@@ -422,6 +422,7 @@ $('#outBtn').onclick = async () => { try { await fetch('/api/logout', { method: 
     document.querySelector('.user').hidden = guest;
     $('#bellBtn').hidden = !appr;
     $('#pwBtn').hidden = ME.role === 'approver';
+    $('#outBtn').hidden = !!ME.open;
     if (!guest) {
       const av = $('#uAvatar'); av.classList.add('logo'); av.innerHTML = '<img src="logo.png" alt="">';
       $('#uName').textContent = ME.name; $('#uRole').textContent = ME.role === 'approver' ? 'ARC+ Gateway' : admin ? 'Super Admin' : 'User';
