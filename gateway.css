@@ -362,3 +362,4 @@ nav a .lbl{white-space:nowrap}
 #nav a:hover{transform:translateX(3px)}
 @media (max-width:900px){.duo{grid-template-columns:1fr}.hero-clock{position:static;text-align:left;margin-bottom:6px}.hero-in{padding:20px}.gal{grid-template-columns:repeat(2,1fr)}.gal figure,.gal figure:nth-child(n+4){grid-column:auto}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+#burger{border:0;background:transparent;box-shadow:none;outline:0}#burger:hover{background:rgba(255,162,3,.12)}#burger:focus-visible{outline:2px solid var(--o);outline-offset:2px}
