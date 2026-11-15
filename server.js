@@ -178,7 +178,7 @@ const cleanTools = t => Array.isArray(t) ? [...new Set(t.map(String))].filter(x 
 app.get('/api/users', admin, needDb, async (req, res) => res.json((await pool.query('SELECT * FROM gw_users ORDER BY username')).rows.map(pub)));
 app.post('/api/users', admin, needDb, async (req, res) => {
   const b = req.body || {}, username = String(b.username || '').trim().toLowerCase();
-  if (!/^[a-z0-9._-]{3,32}$/.test(username)) return res.status(400).json({ error: 'Username: 3–32 letters, numbers, dot, dash or underscore.' });
+  if (!/^[a-z0-9._+@-]{3,64}$/.test(username)) return res.status(400).json({ error: 'Use an email or username: 3–64 letters, numbers and . _ - + @ (no spaces).' });
   if (typeof b.password !== 'string' || b.password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
   try {
     const r = await pool.query('INSERT INTO gw_users(username, display_name, password_hash, role, tools) VALUES($1,$2,$3,$4,$5) RETURNING *',

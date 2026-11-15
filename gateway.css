@@ -180,3 +180,16 @@ body.lg-page .lg-field input:not([type=checkbox]):focus{border-bottom-color:#ffa
 /* the sign-in illustration is flat art: do not inherit the icon outline style */
 svg.lg-svg{fill:initial;stroke:none;stroke-width:1}
 
+
+/* password field with Show / Generate / Copy */
+.pwrow{display:flex;gap:8px;align-items:center}
+.pwrow input{flex:1;min-width:0}
+.pwrow .sm{flex:none;height:42px}
+
+
+/* fixes: primary buttons next to .sm, and the search label inheriting form-field styles */
+button.open.sm{background:#0a0a0a;color:#fff;border:0;border-bottom:3px solid var(--o);height:38px;padding:0 18px;font-size:14px;font-weight:700;cursor:pointer}
+button.open.sm:hover{background:#1c1a14}
+:root[data-theme=dark] button.open.sm{background:#26231a}
+label.search{flex-direction:row;align-items:center;gap:8px;font-weight:400;color:var(--ink)}
+.search input:not([type=checkbox]){height:100%;border:0;background:none;padding:0;border-radius:0;font-weight:400}

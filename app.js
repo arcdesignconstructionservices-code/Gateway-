@@ -78,15 +78,24 @@ async function renderAdmin() {
 function userDialog(u) {
   const d = $('#dlg'), f = $('#dlgForm'), isNew = !u;
   f.innerHTML = `<h3>${isNew ? 'Add user' : 'Edit ' + esc(u.username)}</h3>
-    ${isNew ? `<label>Username<input name="username" required autocapitalize="none" spellcheck="false" placeholder="e.g. maria"></label>` : ''}
+    ${isNew ? `<label>Email (used to sign in)<input name="username" type="text" required autocapitalize="none" spellcheck="false" placeholder="e.g. maria@arcdesign.com"></label>` : ''}
     <label>Display name<input name="name" value="${esc(u ? u.name : '')}" placeholder="e.g. Maria Santos"></label>
-    <label>${isNew ? 'Password (8+ characters)' : 'New password (leave blank to keep)'}<input name="password" type="password" autocomplete="new-password" ${isNew ? 'required' : ''} minlength="8"></label>
+    <label>${isNew ? 'Password (8+ characters)' : 'New password (leave blank to keep the current one)'}<div class="pwrow"><input name="password" id="pwIn" type="password" autocomplete="new-password" ${isNew ? 'required' : ''} minlength="8"><button type="button" class="sm" id="pwShow">Show</button><button type="button" class="sm" id="pwGen">Generate</button><button type="button" class="sm" id="pwCopy">Copy</button></div></label>
     <label>Role<select name="role"><option value="user"${u && u.role === 'user' || isNew ? ' selected' : ''}>User</option><option value="admin"${u && u.role === 'admin' ? ' selected' : ''}>Super Admin (everything + Admin Console)</option></select></label>
     <fieldset><legend>Tools this user can open</legend>${GATEWAY_TOOLS.map(t => `<label class="chk"><input type="checkbox" name="tool" value="${esc(t.id)}"${u && (u.tools.includes(t.id) || u.tools.includes('*')) ? ' checked' : ''}> ${esc(t.name)}</label>`).join('')}</fieldset>
     ${isNew ? '' : `<label class="chk"><input type="checkbox" name="active"${u.active ? ' checked' : ''}> Account active</label>`}
     <div class="err" id="dErr"></div>
     <div class="row">${isNew ? '' : '<button type="button" class="danger" id="dDel">Delete</button>'}<span class="spacer"></span><button type="button" id="dCancel">Cancel</button><button class="open sm" id="dSave">Save</button></div>`;
-  $('#dCancel').onclick = () => d.close();
+  const pw = $('#pwIn'), pwShow = $('#pwShow'), pwCopy = $('#pwCopy');
+  pwShow.onclick = () => { pw.type = pw.type === 'password' ? 'text' : 'password'; pwShow.textContent = pw.type === 'password' ? 'Show' : 'Hide'; };
+  $('#pwGen').onclick = () => {
+    const al = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789', r = crypto.getRandomValues(new Uint32Array(14));
+    pw.value = [...r].map(x => al[x % al.length]).join(''); pw.type = 'text'; pwShow.textContent = 'Hide';
+  };
+  pwCopy.onclick = async () => {
+    if (!pw.value) return;
+    try { await navigator.clipboard.writeText(pw.value); pwCopy.textContent = 'Copied'; setTimeout(() => { pwCopy.textContent = 'Copy'; }, 1500); } catch (e) { pw.type = 'text'; pw.select(); }
+  };  $('#dCancel').onclick = () => d.close();
   if (!isNew) $('#dDel').onclick = async () => {
     if (!confirm(`Delete ${u.username}? This cannot be undone.`)) return;
     try { await api('/api/users/' + u.id, { method: 'DELETE' }); d.close(); renderAdmin(); } catch (e) { $('#dErr').textContent = e.message; }
