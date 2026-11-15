@@ -127,7 +127,7 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/logout', (req, res) => { setCookie(req, res, COOKIE, '', 0); res.json({ ok: true }); });
 
 /* ---- everything below needs a session ---- */
-const PUBLIC = /^\/(login(\.html)?|gateway\.css|logo[\w]*\.png|favicon\.png|apple-touch-icon\.png|icon-512\.png|manifest\.webmanifest|signin-bg\.jpg)$/;
+const PUBLIC = /^\/(login(\.html)?|gateway\.css|logo[\w]*\.png|favicon\.png|apple-touch-icon\.png|icon-512\.png|manifest\.webmanifest|signin-\d\.jpg)$/;
 async function sessionUser(req) {
   const s = verify(parseCookies(req)[COOKIE], SESSION_SECRET); if (!s) return null;
   if (s.id === 0) {                                   // env-admin fallback session (database not connected)

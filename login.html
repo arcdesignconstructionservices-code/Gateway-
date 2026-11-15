@@ -13,13 +13,16 @@
 <body class="lg-page">
 <div class="lg-card">
   <aside class="lg-art">
+    <div class="lg-bgs"><i class="on" style="background-image:url(/signin-1.jpg)"></i><i data-bg="/signin-2.jpg"></i><i data-bg="/signin-3.jpg"></i><i data-bg="/signin-4.jpg"></i><i data-bg="/signin-5.jpg"></i></div>
     <div class="lg-artbrand"><img src="logo.png" alt=""><b>ARC<span>+</span></b></div>
     <div class="lg-slides">
       <div class="lg-slide on"><h2>One place for every tool</h2><p>Open Payroll and Inventory from a single dashboard.</p></div>
       <div class="lg-slide"><h2>Your access, your tools</h2><p>Each person sees only the tools they have been given.</p></div>
       <div class="lg-slide"><h2>Secure by design</h2><p>Sign in once, then launch tools with a short-lived token.</p></div>
+      <div class="lg-slide"><h2>One sign-in, every tool</h2><p>No more separate passwords to remember.</p></div>
+      <div class="lg-slide"><h2>Built for the way you work</h2><p>Simple enough to use on site, from any device.</p></div>
     </div>
-    <div class="lg-dots"><button type="button" class="on" aria-label="Slide 1"></button><button type="button" aria-label="Slide 2"></button><button type="button" aria-label="Slide 3"></button></div>
+    <div class="lg-dots"><button type="button" class="on" aria-label="Slide 1"></button><button type="button" class="" aria-label="Slide 2"></button><button type="button" class="" aria-label="Slide 3"></button><button type="button" class="" aria-label="Slide 4"></button><button type="button" class="" aria-label="Slide 5"></button></div>
   </aside>
   <section class="lg-form">
     <div class="lg-brand"><img src="logo_dark.png" alt=""><b>ARC<span>+</span></b></div>
@@ -35,12 +38,14 @@
 </div>
 <script>
 (function () {
-  var s = [].slice.call(document.querySelectorAll('.lg-slide')), d = [].slice.call(document.querySelectorAll('.lg-dots button')), i = 0, t;
-  function go(n) { i = n; s.forEach(function (e, k) { e.classList.toggle('on', k === n); }); d.forEach(function (e, k) { e.classList.toggle('on', k === n); }); }
-  function run() { clearInterval(t); t = setInterval(function () { go((i + 1) % s.length); }, 4500); }
-  d.forEach(function (b, k) { b.onclick = function () { go(k); run(); }; }); go(0); run();
-})();
-const f = document.getElementById('f'), err = document.getElementById('err'), go = document.getElementById('go');
+  var s = [].slice.call(document.querySelectorAll('.lg-slide')), d = [].slice.call(document.querySelectorAll('.lg-dots button')), b = [].slice.call(document.querySelectorAll('.lg-bgs i')), i = 0, t;
+  function go(n) { i = n; s.forEach(function (e, k) { e.classList.toggle('on', k === n); }); d.forEach(function (e, k) { e.classList.toggle('on', k === n); }); b.forEach(function (e, k) { e.classList.toggle('on', k === n); }); }
+  function run() { clearInterval(t); t = setInterval(function () { go((i + 1) % s.length); }, 6000); }
+  d.forEach(function (x, k) { x.onclick = function () { go(k); run(); }; });
+  function load() { b.forEach(function (e) { if (e.dataset.bg && !e.style.backgroundImage) e.style.backgroundImage = 'url(' + e.dataset.bg + ')'; }); }
+  if (document.readyState === 'complete') load(); else addEventListener('load', load);
+  go(0); run();
+})();const f = document.getElementById('f'), err = document.getElementById('err'), go = document.getElementById('go');
 f.onsubmit = async e => {
   e.preventDefault(); err.textContent = ''; go.disabled = true;
   try {
