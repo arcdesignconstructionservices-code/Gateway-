@@ -7,8 +7,8 @@
 
    Environment variables (Railway):
      DATABASE_URL    Postgres for the users table
-     ADMIN_USER      first Super Admin username   (only used when there are no users yet)
-     ADMIN_PASSWORD  first Super Admin password   (min 8 chars)
+     ADMIN_USER      first Super Admin email/username (only used when there are no users yet; APP_USER also works)
+     ADMIN_PASSWORD  first Super Admin password (min 8 chars; APP_PASSWORD also works)
      SESSION_SECRET  random string that signs the Gateway session cookie
      SSO_SECRET      random string shared with Payroll + Inventory (signs launch tokens)
    ============================================================ */
@@ -21,6 +21,10 @@ const { promisify } = require('util');
 const { Pool } = require('pg');
 const scrypt = promisify(crypto.scrypt);
 
+// The first Super Admin can come from ADMIN_USER / ADMIN_PASSWORD, or from APP_USER / APP_PASSWORD
+// (the same variable names Payroll and Inventory use).
+if (!process.env.ADMIN_USER && process.env.APP_USER) process.env.ADMIN_USER = process.env.APP_USER;
+if (!process.env.ADMIN_PASSWORD && process.env.APP_PASSWORD) process.env.ADMIN_PASSWORD = process.env.APP_PASSWORD;
 const SESSION_SECRET = process.env.SESSION_SECRET || process.env.SSO_SECRET || crypto.randomBytes(32).toString('hex');
 if (!process.env.SESSION_SECRET && !process.env.SSO_SECRET) console.warn('No SESSION_SECRET set — sessions reset on every restart.');
 const SSO_SECRET = process.env.SSO_SECRET || '';
