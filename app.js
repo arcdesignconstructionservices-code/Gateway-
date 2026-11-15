@@ -105,7 +105,7 @@ function renderDashboard() {
         <h1>${greeting()}${first ? ', ' + esc(first) : ''}.</h1>
         <p>Everything ARC Design &amp; Construction Services runs on, in one place.</p>
         <div class="hero-act">${myTools().filter(t => t.url).map(t => `<a class="open" href="/launch/${esc(t.id)}" target="_blank" rel="noopener">${esc(t.name)} ${svg('open')}</a>`).join('')}
-        ${appr ? `<a class="ghost" href="#requests"><i class="ping"></i><span id="hPend">${pendingCount ? pendingCount + ' waiting for approval' : 'No requests waiting'}</span></a>` : ''}</div>
+        ${appr ? `<a class="ghost" href="/requests"><i class="ping"></i><span id="hPend">${pendingCount ? pendingCount + ' waiting for approval' : 'No requests waiting'}</span></a>` : ''}</div>
       </div>
     </section>
     <div class="kpis">
@@ -116,7 +116,7 @@ function renderDashboard() {
     ${tools.length ? `<div class="grid">${tools.map((t, i) => card(t).replace('<article class="card"', `<article class="card rise" style="--i:${i}"`).replace(/<span class="status([^"]*)"><i><\/i>(Active|Coming soon)<\/span>/, (m, c, w) => w === 'Active' ? `<span class="status" data-st="${esc(t.id)}"><i></i>Checking…</span>` : m)).join('')}</div>`
       : `<div class="empty">${!myTools().length ? 'You have no tools yet.' : 'No tools match your search.'}</div>`}
     <div class="duo">
-      ${appr ? `<section class="panel rise" style="--i:3"><div class="sect s2"><h2>Recent activity</h2><a href="#settings/activity">See all</a></div><ul class="feed" id="feed"><li class="none">Loading…</li></ul></section>` : ''}
+      ${appr ? `<section class="panel rise" style="--i:3"><div class="sect s2"><h2>Recent activity</h2><a href="/settings/activity">See all</a></div><ul class="feed" id="feed"><li class="none">Loading…</li></ul></section>` : ''}
       <section class="panel rise${appr ? '' : ' wide'}" style="--i:4"><div class="sect s2"><h2>Our work</h2></div><div class="gal">${PHOTOS.map(n => `<figure style="--i:${n}"><img loading="lazy" src="/signin-${n}.jpg" alt="ARC project ${n}"></figure>`).join('')}</div></section>
     </div>`;
   $('#view').querySelectorAll('[data-fav]').forEach(b => b.onclick = () => { const id = b.dataset.fav; favs = isFav(id) ? favs.filter(x => x !== id) : [...favs, id]; saveFavs(); b.classList.toggle('on', isFav(id)); });
@@ -197,7 +197,7 @@ const initials = n => String(n || '?').trim().split(/\s+/).map(w => w[0]).join('
 const toolOf = id => GATEWAY_TOOLS.find(t => t.id === id) || { icon: 'doc', name: id };
 const ago = ts => { const s = Math.max(1, Math.round((Date.now() - new Date(ts)) / 1000)); if (s < 60) return 'just now'; const m = Math.round(s / 60); if (m < 60) return m + ' min ago'; const h = Math.round(m / 60); return h < 24 ? h + ' h ago' : Math.round(h / 24) + ' d ago'; };
 const when = ts => ts ? new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
-const isReqPage = () => (location.hash.slice(1) || '').split('/')[0] === 'requests';
+const isReqPage = () => routeParts()[0] === 'requests';
 
 function setBadge(n) {
   pendingCount = Math.max(0, n);
@@ -230,7 +230,7 @@ function popup(r, force) {
   const el = document.createElement('div'); el.className = 'rtoast'; el.dataset.id = r.id;
   el.innerHTML = `<div class="rt-top"><b>New access request</b><button class="rt-x" aria-label="Dismiss">&times;</button></div>
     <div class="rt-body"><b>${esc(r.name)}</b> wants to open <b>${esc(r.toolName)}</b><div class="muted">${esc(r.email)}${r.note ? ' &middot; ' + esc(r.note) : ''}</div></div>
-    ${r.test ? '<div class="rt-act"><span class="muted">Test alert &mdash; nothing to approve.</span></div>' : '<div class="rt-act"><button class="open sm" data-a="approve">Approve</button><button class="sm" data-a="deny">Deny</button><a class="rt-link" href="#requests">Review all</a></div>'}`;
+    ${r.test ? '<div class="rt-act"><span class="muted">Test alert &mdash; nothing to approve.</span></div>' : '<div class="rt-act"><button class="open sm" data-a="approve">Approve</button><button class="sm" data-a="deny">Deny</button><a class="rt-link" href="/requests">Review all</a></div>'}`;
   el.querySelector('.rt-x').onclick = () => el.remove();
   const rl = el.querySelector('.rt-link'); if (rl) rl.onclick = () => el.remove();
   if (r.test) setTimeout(() => el.remove(), 6000);
@@ -301,7 +301,7 @@ async function loadRequests() {
 }
 
 /* ---------- Settings: General + Activity log ---------- */
-const routeParts = () => (location.hash.slice(1) || '').split('/');
+function routeParts() { return location.pathname.replace(/^\/+|\/+$/g, '').split('/'); }
 const isActivity = () => routeParts()[0] === 'settings' && routeParts()[1] === 'activity';
 const onLive = () => { if (isReqPage()) loadRequests(); if (isActivity()) loadLogs(); if ($('#feed')) { loadDashLive(); const h = $('#hPend'); if (h) h.textContent = pendingCount ? pendingCount + ' waiting for approval' : 'No requests waiting'; } };
 const lg = { page: 1, q: '', action: '' };
@@ -314,7 +314,7 @@ const EV = {
 async function renderSettings() {
   const tab = isActivity() ? 'activity' : 'general';
   $('#view').innerHTML = `<h1>Settings</h1><p class="sub">Notifications, how access requests behave, and a trail of everything that happens.</p>
-    <div class="tabs"><a href="#settings" class="${tab === 'general' ? 'on' : ''}">General</a><a href="#settings/activity" class="${tab === 'activity' ? 'on' : ''}">Activity log</a></div><div id="setBody"></div>`;
+    <div class="tabs"><a href="/settings" class="${tab === 'general' ? 'on' : ''}">General</a><a href="/settings/activity" class="${tab === 'activity' ? 'on' : ''}">Activity log</a></div><div id="setBody"></div>`;
   if (tab === 'activity') return renderLogs();
   const body = $('#setBody');
   let S; try { S = await api('/api/settings'); } catch (e) { body.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
@@ -350,7 +350,7 @@ async function renderLogs() {
   const body = $('#setBody');
   body.innerHTML = `<div class="logbar"><label class="search lgsearch"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="lq" type="search" placeholder="Search name, email, IP, tool…" value="${esc(lg.q)}" autocomplete="off"></label>
     <select id="la" aria-label="Event type"><option value="">All events</option>${Object.entries(EV).map(([k, v]) => `<option value="${k}"${lg.action === k ? ' selected' : ''}>${esc(v[0])}</option>`).join('')}</select>
-    <span class="spacer"></span><a class="sm btnlink" id="lcsv" href="#">Export CSV</a></div><div id="logList"><div class="empty">Loading…</div></div>`;
+    <span class="spacer"></span><a class="sm btnlink" id="lcsv" href="/api/logs.csv">Export CSV</a></div><div id="logList"><div class="empty">Loading…</div></div>`;
   let tm = null;
   $('#lq').oninput = e => { clearTimeout(tm); tm = setTimeout(() => { lg.q = e.target.value; lg.page = 1; loadLogs(); }, 250); };
   $('#la').onchange = e => { lg.action = e.target.value; lg.page = 1; loadLogs(); };
@@ -374,26 +374,34 @@ function paintNav(route) {
   const admin = ME.role === 'admin', appr = admin || ME.role === 'approver';
   const link = (href, id, icon, text, extra, attrs) => `<a href="${href}" class="${route === id ? 'on' : ''}" title="${esc(text)}"${attrs || ''}>${svg(icon)}<span class="lbl">${esc(text)}</span>${extra || ''}</a>`;
   $('#nav').innerHTML = `<div class="navlbl">Workspace</div>
-    ${link('#dashboard', 'dashboard', 'dash', 'Gateway Dashboard')}
-    ${appr ? link('#requests', 'requests', 'bell', 'Access requests', `<em class="nbadge" id="navBadge"${pendingCount ? '' : ' hidden'}>${pendingCount}</em>`) : ''}
-    ${admin ? link('#admin', 'admin', 'shield', 'Admin Console') : ''}
+    ${link('/', 'dashboard', 'dash', 'Gateway Dashboard')}
+    ${appr ? link('/requests', 'requests', 'bell', 'Access requests', `<em class="nbadge" id="navBadge"${pendingCount ? '' : ' hidden'}>${pendingCount}</em>`) : ''}
+    ${admin ? link('/admin', 'admin', 'shield', 'Admin Console') : ''}
     <div class="navlbl">Tools</div>
     ${myTools().map(t => t.url
       ? `<a href="/launch/${esc(t.id)}" target="_blank" rel="noopener" title="${esc(t.name)}">${svg(t.icon)}<span class="lbl">${esc(t.name)}</span></a>`
-      : `<a class="off" href="#dashboard" title="${esc(t.name)} (coming soon)">${svg(t.icon)}<span class="lbl">${esc(t.name)}</span></a>`).join('') || '<span class="navnone">No tools yet</span>'}
+      : `<a class="off" href="/" title="${esc(t.name)} (coming soon)">${svg(t.icon)}<span class="lbl">${esc(t.name)}</span></a>`).join('') || '<span class="navnone">No tools yet</span>'}
     <div class="navlbl">Personal</div>
-    ${link('#mytools', 'mytools', 'star', 'My Tools')}
-    ${appr ? `<div class="navlbl">System</div>${link('#settings', 'settings', 'gear', 'Settings')}` : ''}`;
+    ${link('/mytools', 'mytools', 'star', 'My Tools')}
+    ${appr ? `<div class="navlbl">System</div>${link('/settings', 'settings', 'gear', 'Settings')}` : ''}`;
 }function render() {
-  const route = (location.hash.slice(1) || 'dashboard').split('/')[0];
+  const route = routeParts()[0] || 'dashboard';
   const isAppr = ME.role === 'admin' || ME.role === 'approver';
   const r = (route === 'admin' && ME.role !== 'admin') || ((route === 'requests' || route === 'settings') && !isAppr) ? 'dashboard' : route;
   paintNav(r);
   $('#crumbSub').textContent = { admin: 'Admin console', requests: 'Access requests', settings: 'Settings', mytools: 'My tools' }[r] || 'Internal portal';
   if (r === 'admin') renderAdmin(); else if (r === 'requests') renderRequests(); else if (r === 'settings') renderSettings(); else if (r === 'mytools') renderTools(true); else renderDashboard();
 }
-addEventListener('hashchange', () => { document.documentElement.classList.remove('navopen'); if (ME) render(); });
-$('#q').oninput = e => { query = e.target.value; if (ME && !/^#(admin|requests|settings)/.test(location.hash)) render(); };
+/* clean addresses (no #): in-app links change the path without reloading */
+const ROUTE = /^\/(requests|settings(\/activity)?|admin|mytools)?\/?$/;
+function go(p) { if (p !== location.pathname) history.pushState(null, '', p); document.documentElement.classList.remove('navopen'); window.scrollTo(0, 0); if (ME) render(); }
+addEventListener('popstate', () => { document.documentElement.classList.remove('navopen'); if (ME) render(); });
+document.addEventListener('click', e => {
+  const a = e.target.closest && e.target.closest('a[href]'); if (!a || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || a.target) return;
+  const h = a.getAttribute('href'); if (h && ROUTE.test(h)) { e.preventDefault(); go(h); }
+});
+{ const m = /^#\/?(requests|settings(\/activity)?|admin|mytools|dashboard)?$/.exec(location.hash); if (m) history.replaceState(null, '', m[1] && m[1] !== 'dashboard' ? '/' + m[1] : '/'); }
+$('#q').oninput = e => { query = e.target.value; if (ME && !/^\/(admin|requests|settings)/.test(location.pathname)) render(); };
 const isPhone = () => matchMedia('(max-width:900px)').matches;
 function setCollapsed(c) { document.documentElement.classList.toggle('collapsed', c); try { localStorage.setItem(KEY + '-coll', c ? '1' : ''); } catch (e) { } $('#burger').setAttribute('aria-expanded', String(!c)); }
 try { setCollapsed(localStorage.getItem(KEY + '-coll') === '1'); } catch (e) { }
@@ -404,7 +412,7 @@ function setTheme(t) { document.documentElement.dataset.theme = t; try { localSt
 (function () { let t = 'light'; try { t = localStorage.getItem(KEY + '-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch (e) { } setTheme(t); })();
 $('#themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 $('#pwBtn').onclick = passwordDialog;
-$('#bellBtn').onclick = () => { location.hash = 'requests'; };
+$('#bellBtn').onclick = () => go('/requests');
 $('#outBtn').onclick = async () => { try { await fetch('/api/logout', { method: 'POST' }); } catch (e) { } location.href = '/'; };
 
 (async function boot() {

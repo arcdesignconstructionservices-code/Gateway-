@@ -197,7 +197,7 @@ app.get('/approver', (req, res) => {
   }
   audit('approver.link_opened', { actor: 'Super Admin', ip: req.ip, detail: 'a device was set up to approve requests' });
   setCookie(req, res, APPROVER_COOKIE, sign({ r: 'approver', k: sha(APPROVER_KEY).slice(0, 16), exp: Date.now() + APPROVER_MS }, SESSION_SECRET), APPROVER_MS);
-  res.redirect('/#requests');
+  res.redirect('/requests');
 });
 app.get(['/login', '/login.html'], (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
 
