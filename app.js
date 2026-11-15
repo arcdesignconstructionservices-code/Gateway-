@@ -63,7 +63,7 @@ function renderTools(mine) {
 }
 
 /* ---------- Dashboard: hero, live numbers, tools, activity, gallery ---------- */
-const PHOTOS = [1, 2, 3, 4, 5];
+const PHOTOS = [1, 2, 3, 4, 5, 6, 7, 8];
 let heroTimer = null, clockTimer = null, statusData = [], statsData = null;
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function greeting() { const h = new Date().getHours(); return h < 5 ? 'Working late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; }
