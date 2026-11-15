@@ -12,7 +12,8 @@ const ICONS = {
   tool: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
   open: '<path d="M7 17 17 7M8 7h9v9"/>',
   shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
-  out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/>'
+  out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/>',
+  bell: '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>'
 };
 const svg = n => `<svg viewBox="0 0 24 24">${ICONS[n] || ICONS.doc}</svg>`;
 
@@ -124,12 +125,104 @@ function passwordDialog() {
   d.showModal();
 }
 
+/* ---------- Access requests (live) ---------- */
+let reqs = [], pendingCount = 0, es = null, audioCtx = null;
+const initials = n => String(n || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+const toolOf = id => GATEWAY_TOOLS.find(t => t.id === id) || { icon: 'doc', name: id };
+const ago = ts => { const s = Math.max(1, Math.round((Date.now() - new Date(ts)) / 1000)); if (s < 60) return 'just now'; const m = Math.round(s / 60); if (m < 60) return m + ' min ago'; const h = Math.round(m / 60); return h < 24 ? h + ' h ago' : Math.round(h / 24) + ' d ago'; };
+const when = ts => ts ? new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
+const isReqPage = () => (location.hash.slice(1) || '').split('/')[0] === 'requests';
+
+function setBadge(n) {
+  pendingCount = Math.max(0, n);
+  const b = $('#bellBadge'); if (b) { b.textContent = pendingCount > 9 ? '9+' : pendingCount; b.hidden = !pendingCount; }
+  const nb = $('#navBadge'); if (nb) { nb.textContent = pendingCount; nb.hidden = !pendingCount; }
+  document.title = (pendingCount ? '(' + pendingCount + ') ' : '') + 'ARC+ Gateway';
+}
+function beep() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const t = audioCtx.currentTime;
+    [[880, 0], [1175, .17]].forEach(([f, d]) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.2, t + d + .02); g.gain.exponentialRampToValueAtTime(0.0001, t + d + .3);
+      o.connect(g); g.connect(audioCtx.destination); o.start(t + d); o.stop(t + d + .32);
+    });
+  } catch (e) { }
+}
+addEventListener('pointerdown', () => { try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); } catch (e) { } });
+
+function note(text, bad) {
+  const el = document.createElement('div'); el.className = 'rtoast small' + (bad ? ' bad' : ''); el.textContent = text;
+  $('#toasts').appendChild(el); setTimeout(() => el.remove(), 3500);
+}
+function popup(r) {
+  const box = $('#toasts'); if (!box || box.querySelector('.rtoast[data-id="' + r.id + '"]')) return;
+  const el = document.createElement('div'); el.className = 'rtoast'; el.dataset.id = r.id;
+  el.innerHTML = `<div class="rt-top"><b>New access request</b><button class="rt-x" aria-label="Dismiss">&times;</button></div>
+    <div class="rt-body"><b>${esc(r.name)}</b> wants to open <b>${esc(r.toolName)}</b><div class="muted">${esc(r.email)}${r.note ? ' &middot; ' + esc(r.note) : ''}</div></div>
+    <div class="rt-act"><button class="open sm" data-a="approve">Approve</button><button class="sm" data-a="deny">Deny</button><a class="rt-link" href="#requests">Review all</a></div>`;
+  el.querySelector('.rt-x').onclick = () => el.remove();
+  el.querySelector('.rt-link').onclick = () => el.remove();
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try { await api('/api/access/' + r.id + '/' + b.dataset.a, { method: 'POST', body: {} }); el.remove(); note(b.dataset.a === 'approve' ? r.name + ' approved — they are being let in.' : r.name + ' was declined.'); }
+    catch (e) { b.disabled = false; note(e.message, true); }
+  });
+  while (box.querySelectorAll('.rtoast:not(.small)').length >= 4) box.querySelector('.rtoast:not(.small)').remove();
+  box.appendChild(el); beep();
+}
+async function refreshPending() { try { const m = await api('/api/me'); setBadge(m.pending || 0); } catch (e) { } }
+function live() {
+  if (es) return;
+  es = new EventSource('/api/events');
+  es.addEventListener('hello', () => { refreshPending(); if (isReqPage()) loadRequests(); });
+  es.addEventListener('request', ev => { const r = JSON.parse(ev.data); setBadge(pendingCount + 1); popup(r); if (isReqPage()) loadRequests(); });
+  es.addEventListener('update', ev => {
+    const r = JSON.parse(ev.data);
+    document.querySelectorAll('.rtoast[data-id="' + r.id + '"]').forEach(e => e.remove());
+    refreshPending(); if (isReqPage()) loadRequests();
+  });
+}
+
+async function renderRequests() {
+  $('#view').innerHTML = `<h1>Access requests</h1><p class="sub">People asking to open a tool. You are told here the moment someone asks; approve and they are let in automatically.</p><div id="rList"><div class="empty">Loading…</div></div>`;
+  await loadRequests();
+}
+async function loadRequests() {
+  const el = $('#rList'); if (!el) return;
+  try { reqs = await api('/api/access'); } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  const pend = reqs.filter(r => r.status === 'pending'), rest = reqs.filter(r => r.status !== 'pending');
+  setBadge(pend.length);
+  const pill = s => `<span class="pill ${s === 'approved' ? 'ok' : s === 'pending' ? 'warn' : ''}">${esc(s)}</span>`;
+  el.innerHTML = `<h2 class="h2">Waiting for you ${pend.length ? `<span class="pill warn">${pend.length}</span>` : ''}</h2>
+    ${pend.length ? `<div class="rgrid">${pend.map(r => `<article class="rcard">
+      <div class="rc-top"><span class="avatar sm">${esc(initials(r.name))}</span><div style="min-width:0"><b>${esc(r.name)}</b><div class="muted">${esc(r.email)}</div></div><span class="rc-time">${esc(ago(r.created_at))}</span></div>
+      <div class="rc-tool">${svg(toolOf(r.tool).icon)} ${esc(r.toolName)}</div>
+      ${r.note ? `<p class="rc-note">&ldquo;${esc(r.note)}&rdquo;</p>` : ''}
+      <div class="rc-act"><select data-h="${esc(r.id)}" aria-label="How long"><option value="12" selected>12 hours</option><option value="1">1 hour</option><option value="24">24 hours</option><option value="168">7 days</option></select>
+        <button class="open sm" data-approve="${esc(r.id)}">Approve</button><button class="sm" data-deny="${esc(r.id)}">Deny</button></div></article>`).join('')}</div>`
+      : '<div class="empty">No one is waiting. New requests appear here instantly.</div>'}
+    <h2 class="h2">Recent</h2>
+    ${rest.length ? `<div class="tbl"><table><thead><tr><th>Person</th><th>Tool</th><th>Status</th><th>Decided by</th><th>Access until</th><th></th></tr></thead><tbody>${rest.map(r => `<tr>
+      <td><b>${esc(r.name)}</b><div class="muted">${esc(r.email)}</div></td><td>${esc(r.toolName)}</td><td>${pill(r.status)}</td>
+      <td>${esc(r.decided_by || '—')}</td><td>${r.status === 'approved' ? esc(when(r.expires_at)) : '—'}</td>
+      <td class="r">${r.status === 'approved' ? `<button class="sm danger" data-revoke="${esc(r.id)}">Revoke</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Nothing yet.</div>'}`;
+  const act = async (id, what, body, msg) => { try { await api('/api/access/' + id + '/' + what, { method: 'POST', body: body || {} }); note(msg); } catch (e) { note(e.message, true); } loadRequests(); };
+  el.querySelectorAll('[data-approve]').forEach(b => b.onclick = () => act(b.dataset.approve, 'approve', { hours: +el.querySelector('[data-h="' + b.dataset.approve + '"]').value }, 'Approved — they are being let in.'));
+  el.querySelectorAll('[data-deny]').forEach(b => b.onclick = () => act(b.dataset.deny, 'deny', {}, 'Request declined.'));
+  el.querySelectorAll('[data-revoke]').forEach(b => b.onclick = () => { if (confirm('Revoke this person\'s access now? They will be signed out within about 30 seconds.')) act(b.dataset.revoke, 'revoke', {}, 'Access revoked.'); });
+}
+
 /* ---------- shell ---------- */
 function paintNav(route) {
   const admin = ME.role === 'admin';
   $('#nav').innerHTML = `<div class="navlbl">Workspace</div>
     <a href="#dashboard" class="${route === 'dashboard' ? 'on' : ''}">${svg('dash')}Gateway Dashboard</a>
-    ${admin ? `<a href="#admin" class="${route === 'admin' ? 'on' : ''}">${svg('shield')}Admin Console</a>` : ''}
+    ${admin ? `<a href="#requests" class="${route === 'requests' ? 'on' : ''}">${svg('bell')}Access requests<em class="nbadge" id="navBadge"${pendingCount ? '' : ' hidden'}>${pendingCount}</em></a>
+    <a href="#admin" class="${route === 'admin' ? 'on' : ''}">${svg('shield')}Admin Console</a>` : ''}
     <div class="navlbl">Tools</div>
     ${myTools().map(t => t.url
       ? `<a href="/launch/${esc(t.id)}" target="_blank" rel="noopener">${svg(t.icon)}${esc(t.name)}</a>`
@@ -139,27 +232,34 @@ function paintNav(route) {
 }
 function render() {
   const route = (location.hash.slice(1) || 'dashboard').split('/')[0];
-  const r = route === 'admin' && ME.role !== 'admin' ? 'dashboard' : route;
+  const r = (route === 'admin' || route === 'requests') && ME.role !== 'admin' ? 'dashboard' : route;
   paintNav(r);
-  $('#crumbSub').textContent = { admin: 'Admin console', mytools: 'My tools' }[r] || 'Internal portal';
-  if (r === 'admin') renderAdmin(); else renderTools(r === 'mytools');
+  $('#crumbSub').textContent = { admin: 'Admin console', requests: 'Access requests', mytools: 'My tools' }[r] || 'Internal portal';
+  if (r === 'admin') renderAdmin(); else if (r === 'requests') renderRequests(); else renderTools(r === 'mytools');
 }
 addEventListener('hashchange', () => { document.documentElement.classList.remove('navopen'); if (ME) render(); });
-$('#q').oninput = e => { query = e.target.value; if (ME && !/^#admin/.test(location.hash)) render(); };
+$('#q').oninput = e => { query = e.target.value; if (ME && !/^#(admin|requests)/.test(location.hash)) render(); };
 $('#burger').onclick = () => document.documentElement.classList.toggle('navopen');
 $('#scrim').onclick = () => document.documentElement.classList.remove('navopen');
 function setTheme(t) { document.documentElement.dataset.theme = t; try { localStorage.setItem(KEY + '-theme', t); } catch (e) { } }
 (function () { let t = 'light'; try { t = localStorage.getItem(KEY + '-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch (e) { } setTheme(t); })();
 $('#themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 $('#pwBtn').onclick = passwordDialog;
-$('#outBtn').onclick = async () => { try { await fetch('/api/logout', { method: 'POST' }); } catch (e) { } location.href = '/login'; };
+$('#bellBtn').onclick = () => { location.hash = 'requests'; };
+$('#outBtn').onclick = async () => { try { await fetch('/api/logout', { method: 'POST' }); } catch (e) { } location.href = '/'; };
 
 (async function boot() {
   try {
     ME = await api('/api/me');
-    const initials = (ME.name || ME.username).split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
-    $('#uAvatar').textContent = initials; $('#uName').textContent = ME.name; $('#uRole').textContent = ME.role === 'admin' ? 'Super Admin' : 'User';
-    if (ME.authOff) { const u = document.querySelector('.user'); if (u) u.style.display = 'none'; }
+    const guest = !ME.signedIn, admin = ME.role === 'admin';
+    $('#signInBtn').hidden = !guest;
+    document.querySelector('.user').hidden = guest;
+    $('#bellBtn').hidden = !admin;
+    if (!guest) {
+      $('#uAvatar').textContent = initials(ME.name || ME.username);
+      $('#uName').textContent = ME.name; $('#uRole').textContent = admin ? 'Super Admin' : 'User';
+    }
+    if (admin) { setBadge(ME.pending || 0); live(); }
     render();
-  } catch (e) { /* api() already redirected to /login on 401 */ }
+  } catch (e) { /* api() redirects to /login when an admin page is opened without a session */ }
 })();
