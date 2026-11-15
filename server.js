@@ -36,7 +36,7 @@ const COOKIE = 'gw_session';
 const APPROVER_COOKIE = 'gw_approver';
 const APPROVER_KEY = process.env.APPROVER_KEY || '';
 const APPROVER_MS = 180 * 24 * 3600 * 1000;
-const APPROVER_USER = { id: -2, username: 'approver', display_name: 'Approver', role: 'approver', tools: ['*'], active: true };
+const APPROVER_USER = { id: -2, username: 'approver', display_name: 'Super Admin', role: 'approver', tools: ['*'], active: true };
 
 /* ---------- tools (shared with the front end) ---------- */
 function loadTools() {
@@ -80,6 +80,8 @@ const pool = process.env.DATABASE_URL ? (() => {
   return new Pool({ connectionString: process.env.DATABASE_URL, ssl, max: 5, idleTimeoutMillis: 30000 });
 })() : null;
 let dbReady = false;
+// Settings an approver can change on the Gateway's Settings page (saved in Postgres)
+const SETTINGS = { acceptRequests: true, defaultHours: [1, 12, 24, 168].includes(ACCESS_HOURS) ? ACCESS_HOURS : 12 };
 async function initDb() {
   if (!pool) { console.warn('No DATABASE_URL — users and access requests need a database.'); return; }
   try {
@@ -91,6 +93,11 @@ async function initDb() {
       id TEXT PRIMARY KEY, tool TEXT NOT NULL, name TEXT NOT NULL, email TEXT NOT NULL, note TEXT NOT NULL DEFAULT '',
       ip TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', key_hash TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(), decided_at TIMESTAMPTZ, decided_by TEXT, expires_at TIMESTAMPTZ)`);
+    await pool.query('CREATE TABLE IF NOT EXISTS gw_settings(key TEXT PRIMARY KEY, value JSONB NOT NULL)');
+    await pool.query(`CREATE TABLE IF NOT EXISTS gw_log(
+      id SERIAL PRIMARY KEY, ts TIMESTAMPTZ NOT NULL DEFAULT now(), action TEXT NOT NULL, actor TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT '', tool TEXT NOT NULL DEFAULT '', ip TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '')`);
+    try { for (const r of (await pool.query('SELECT key, value FROM gw_settings')).rows) SETTINGS[r.key] = typeof r.value === 'string' ? JSON.parse(r.value) : r.value; } catch (e) { console.error('settings load failed:', e.message); }
     const n = (await pool.query('SELECT count(*)::int AS n FROM gw_users')).rows[0].n;
     if (!n && process.env.ADMIN_USER && process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD.length >= 8) {
       await pool.query('INSERT INTO gw_users(username, display_name, password_hash, role, tools) VALUES($1,$2,$3,$4,$5)',
@@ -101,6 +108,14 @@ async function initDb() {
   } catch (e) { dbReady = false; console.error('DB init failed:', e.message); setTimeout(initDb, 5000); }
 }
 initDb();
+/* ---------- activity log: who did what, when, from which IP ---------- */
+async function audit(action, o = {}) {
+  if (!pool || !dbReady) return;
+  try {
+    await pool.query('INSERT INTO gw_log(action, actor, email, tool, ip, detail) VALUES($1,$2,$3,$4,$5,$6)', [action, clean(o.actor, 80), clean(o.email, 120), clean(o.tool, 40), clean(o.ip, 64), clean(o.detail, 300)]);
+    if (Math.random() < 0.02) await pool.query("DELETE FROM gw_log WHERE ts < now() - interval '365 days'");
+  } catch (e) { console.error('audit failed:', e.message); }
+}
 const pub = u => ({ id: u.id, username: u.username, name: u.display_name || u.username, role: u.role, tools: u.tools, active: u.active, created_at: u.created_at });
 async function findUser(username) {
   if (pool && dbReady) return (await pool.query('SELECT * FROM gw_users WHERE username = $1', [String(username).toLowerCase()])).rows[0] || null;
@@ -164,16 +179,23 @@ app.post('/api/login', async (req, res) => {
     if (u) { if (!u.active || !(await checkPw(password, u.password_hash))) u = null; }
     else if (!dbReady) u = await envAdmin(username, password);
     else await scrypt(password, 'x', 64);                                // keep timing similar for unknown users
-    if (!u) { fail(ip); return res.status(401).json({ error: 'Wrong username or password.' }); }
+    if (!u) { fail(ip); audit('gateway.signin_failed', { actor: 'unknown', email: username, ip: req.ip }); return res.status(401).json({ error: 'Wrong username or password.' }); }
     tries.delete(ip);
+    audit('gateway.signin', { actor: u.display_name || u.username, email: u.username, ip: req.ip });
     setCookie(req, res, COOKIE, sign({ id: u.id, u: u.username, exp: Date.now() + SESSION_MS }, SESSION_SECRET), SESSION_MS);
     res.json({ ok: true });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Sign-in failed. Try again.' }); }
 });
 app.post('/api/logout', (req, res) => { setCookie(req, res, COOKIE, '', 0); setCookie(req, res, APPROVER_COOKIE, '', 0); res.json({ ok: true }); });
+const badLink = new Map();
 app.get('/approver', (req, res) => {
   const a = Buffer.from(sha(String(req.query.key || ''))), b = Buffer.from(sha(APPROVER_KEY));
-  if (!APPROVER_KEY || !crypto.timingSafeEqual(a, b)) return res.status(404).send('Not found');
+  if (!APPROVER_KEY || !crypto.timingSafeEqual(a, b)) {
+    const last = badLink.get(req.ip) || 0;                                  // log failed attempts at most once a minute per IP
+    if (Date.now() - last > 60000) { badLink.set(req.ip, Date.now()); audit('approver.link_failed', { actor: 'unknown', ip: req.ip, detail: 'wrong or missing key' }); }
+    return res.status(404).send('Not found');
+  }
+  audit('approver.link_opened', { actor: 'Super Admin', ip: req.ip, detail: 'a device was set up to approve requests' });
   setCookie(req, res, APPROVER_COOKIE, sign({ r: 'approver', k: sha(APPROVER_KEY).slice(0, 16), exp: Date.now() + APPROVER_MS }, SESSION_SECRET), APPROVER_MS);
   res.redirect('/#requests');
 });
@@ -199,7 +221,7 @@ app.get('/launch/:id', (req, res) => {
   if (!canOpen(req.user, t.id)) return res.status(403).send('You do not have access to this tool.');
   const base = t.url.replace(/\/$/, '');
   if (!req.user || !SSO_SECRET) return res.redirect(base + '/');          // visitors go to the tool's own sign-in / Request access page
-  const token = sign({ t: t.id, sub: req.user.username, name: req.user.display_name || req.user.username, exp: Date.now() + 60000 }, SSO_SECRET);
+  const token = sign({ t: t.id, sub: req.user.username, name: req.user.display_name || req.user.username, ap: ['admin', 'approver'].includes(req.user.role), exp: Date.now() + 60000 }, SSO_SECRET);
   res.redirect(`${base}/sso?token=${encodeURIComponent(token)}`);       // signed-in Gateway users go straight in
 });
 
@@ -226,6 +248,7 @@ function toolAuth(req, res, next) {
   req.tool = p.t; next();
 }
 app.post('/api/tool/access', toolAuth, needDb, async (req, res) => {
+  if (!SETTINGS.acceptRequests) return res.status(403).json({ error: 'Access requests are paused right now. Please contact an administrator.' });
   const b = req.body || {}, name = clean(b.name, 80), email = clean(b.email, 120).toLowerCase(), note = clean(b.note, 200), ip = clean(b.ip, 64);
   if (name.length < 2) return res.status(400).json({ error: 'Please enter your name.' });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return res.status(400).json({ error: 'Please enter a valid email address.' });
@@ -237,6 +260,7 @@ app.post('/api/tool/access', toolAuth, needDb, async (req, res) => {
   const id = crypto.randomBytes(9).toString('hex'), key = crypto.randomBytes(24).toString('hex');
   const r = (await pool.query('INSERT INTO gw_access(id, tool, name, email, note, ip, key_hash) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *', [id, req.tool, name, email, note, ip, sha(key)])).rows[0];
   broadcast('request', accessPub(r));
+  audit('request.created', { actor: name, email, tool: req.tool, ip, detail: note });
   res.json({ id, key });
 });
 async function ownRequest(req, res) {
@@ -248,7 +272,7 @@ app.get('/api/tool/access/:id', toolAuth, needDb, async (req, res) => {         
   const r = await ownRequest(req, res); if (!r) return;
   const a = Buffer.from(sha(req.query.key || '')), b = Buffer.from(r.key_hash);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return res.status(403).json({ error: 'Wrong key.' });
-  res.json({ status: effStatus(r), name: r.name, expires_at: r.expires_at });
+  res.json({ status: effStatus(r), name: r.name, email: r.email, expires_at: r.expires_at });
 });
 app.get('/api/tool/access/:id/valid', toolAuth, needDb, async (req, res) => {    // tools re-check an approved session every ~30 s (revoke / expiry)
   const r = await ownRequest(req, res); if (!r) return;
@@ -256,31 +280,102 @@ app.get('/api/tool/access/:id/valid', toolAuth, needDb, async (req, res) => {   
 });
 
 /* ---- admins: see, approve, deny, revoke, live feed ---- */
-app.get('/api/access', approver, needDb, async (req, res) => {
-  const rows = (await pool.query("SELECT * FROM gw_access WHERE status <> 'superseded' ORDER BY (status = 'pending') DESC, created_at DESC LIMIT 100")).rows;
-  res.json(rows.map(accessPub));
+app.get('/api/access', approver, needDb, async (req, res) => {          // ?view=pending|recent&page=1&size=10
+  const view = req.query.view === 'recent' ? 'recent' : 'pending';
+  const size = Math.min(Math.max(parseInt(req.query.size, 10) || 10, 1), 50);
+  const where = view === 'pending' ? "status = 'pending'" : "status NOT IN ('pending', 'superseded')";
+  const total = (await pool.query('SELECT count(*)::int AS n FROM gw_access WHERE ' + where)).rows[0].n;
+  const pages = Math.max(1, Math.ceil(total / size)), page = Math.min(Math.max(parseInt(req.query.page, 10) || 1, 1), pages);
+  const rows = (await pool.query('SELECT * FROM gw_access WHERE ' + where + ' ORDER BY created_at DESC LIMIT $1 OFFSET $2', [size, (page - 1) * size])).rows;
+  res.json({ items: rows.map(accessPub), total, page, pages, size });
+});
+
+/* ---- Activity log (approvers): ?page=1&size=20&q=text&action=request.approved ---- */
+function logQuery(req) {
+  const conds = [], params = [];
+  const q = clean(req.query.q, 60).toLowerCase(), action = clean(req.query.action, 40);
+  if (action) { params.push(action); conds.push('action = $' + params.length); }
+  if (q) { params.push('%' + q.replace(/[%_]/g, ' ') + '%'); const n = '$' + params.length; conds.push('(actor ILIKE ' + n + ' OR email ILIKE ' + n + ' OR ip ILIKE ' + n + ' OR detail ILIKE ' + n + ' OR tool ILIKE ' + n + ' OR action ILIKE ' + n + ')'); }
+  return { where: conds.length ? ' WHERE ' + conds.join(' AND ') : '', params };
+}
+app.get('/api/logs', approver, needDb, async (req, res) => {
+  const { where, params } = logQuery(req);
+  const size = Math.min(Math.max(parseInt(req.query.size, 10) || 20, 1), 100);
+  const total = (await pool.query('SELECT count(*)::int AS n FROM gw_log' + where, params)).rows[0].n;
+  const pages = Math.max(1, Math.ceil(total / size)), page = Math.min(Math.max(parseInt(req.query.page, 10) || 1, 1), pages);
+  const rows = (await pool.query('SELECT * FROM gw_log' + where + ' ORDER BY id DESC LIMIT ' + size + ' OFFSET ' + (page - 1) * size, params)).rows;
+  res.json({ items: rows.map(r => ({ ...r, toolName: r.tool ? toolName(r.tool) : '' })), total, page, pages, size });
+});
+app.get('/api/logs.csv', approver, needDb, async (req, res) => {
+  const { where, params } = logQuery(req);
+  const rows = (await pool.query('SELECT * FROM gw_log' + where + ' ORDER BY id DESC LIMIT 5000', params)).rows;
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const csv = ['Time (UTC),Event,Who,Email,Tool,IP,Details'].concat(rows.map(r => [new Date(r.ts).toISOString(), r.action, r.actor, r.email, r.tool, r.ip, r.detail].map(q).join(','))).join('\r\n');
+  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="arc-gateway-activity-' + new Date().toISOString().slice(0, 10) + '.csv"' }).send('\ufeff' + csv);
+});
+
+/* ---- Settings (approvers) ---- */
+app.get('/api/settings', approver, (req, res) => {
+  const origin = (req.headers['x-forwarded-proto'] || req.protocol) + '://' + req.get('host');
+  res.json({ ...SETTINGS, hasKey: !!APPROVER_KEY, approverLink: APPROVER_KEY ? origin + '/approver?key=' + APPROVER_KEY : '', db: dbReady });
+});
+app.put('/api/settings', approver, needDb, async (req, res) => {
+  const b = req.body || {}, next = {};
+  if (b.acceptRequests !== undefined) { if (typeof b.acceptRequests !== 'boolean') return res.status(400).json({ error: 'Bad value.' }); next.acceptRequests = b.acceptRequests; }
+  if (b.defaultHours !== undefined) { if (![1, 12, 24, 168].includes(+b.defaultHours)) return res.status(400).json({ error: 'Choose 1 hour, 12 hours, 24 hours or 7 days.' }); next.defaultHours = +b.defaultHours; }
+  for (const [k, v] of Object.entries(next)) {
+    await pool.query('INSERT INTO gw_settings(key, value) VALUES($1, $2::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value', [k, JSON.stringify(v)]);
+    SETTINGS[k] = v;
+  }
+  if (Object.keys(next).length) audit('settings.changed', { actor: req.user.display_name || req.user.username, ip: req.ip, detail: JSON.stringify(next) });
+  res.json({ ...SETTINGS });
 });
 async function decide(req, res, from, to, extra) {
   const id = String(req.params.id);
   const cur = (await pool.query('SELECT * FROM gw_access WHERE id = $1', [id])).rows[0];
   if (!cur) return res.status(404).json({ error: 'No such request.' });
   if (!from.includes(effStatus(cur))) return res.status(409).json({ error: 'This request is already ' + effStatus(cur) + '.' });
-  const r = (await pool.query('UPDATE gw_access SET status = $1, decided_at = now(), decided_by = $2, expires_at = $3 WHERE id = $4 RETURNING *', [to, req.user.display_name || req.user.username, extra ? extra.expires : null, id])).rows[0];
+  const r = (await pool.query('UPDATE gw_access SET status = $1, decided_at = now(), decided_by = $2, expires_at = $3 WHERE id = $4 RETURNING *', [to, req.decider || (req.user && (req.user.display_name || req.user.username)) || 'Super Admin', extra ? extra.expires : null, id])).rows[0];
   broadcast('update', accessPub(r));
+  audit('request.' + (to === 'approved' ? 'approved' : to === 'denied' ? 'denied' : 'revoked'), { actor: r.decided_by, email: cur.email, tool: cur.tool, ip: req.auditIp || req.ip,
+    detail: (to === 'approved' ? 'for ' + Math.round((new Date(r.expires_at) - Date.now()) / 3600000) + ' h' : '') + (req.via ? (to === 'approved' ? ' ' : '') + 'via ' + req.via : '') });
   res.json(accessPub(r));
 }
 app.post('/api/access/:id/approve', approver, needDb, (req, res) => {
-  const hours = [1, 12, 24, 168].includes(+((req.body || {}).hours)) ? +req.body.hours : ACCESS_HOURS;
+  const hours = [1, 12, 24, 168].includes(+((req.body || {}).hours)) ? +req.body.hours : SETTINGS.defaultHours;
   return decide(req, res, ['pending'], 'approved', { expires: new Date(Date.now() + hours * 3600 * 1000) });
 });
 app.post('/api/access/:id/deny', approver, needDb, (req, res) => decide(req, res, ['pending'], 'denied'));
 app.post('/api/access/:id/revoke', approver, needDb, (req, res) => decide(req, res, ['approved'], 'revoked'));
-app.get('/api/events', approver, (req, res) => {
+function openStream(req, res) {
   res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
   res.flushHeaders && res.flushHeaders();
   res.write('retry: 3000\n\nevent: hello\ndata: {}\n\n');
   sseClients.add(res);
   req.on('close', () => sseClients.delete(res));
+}
+app.get('/api/events', approver, openStream);
+
+/* ---- tools (Payroll, Inventory ...) show requests in their header bell: the tool verifies its user is an approver, then calls these ---- */
+app.get('/api/tool/pending', toolAuth, needDb, async (req, res) => {
+  const rows = (await pool.query("SELECT * FROM gw_access WHERE status = 'pending' ORDER BY created_at DESC LIMIT 50")).rows;
+  res.json({ requests: rows.map(accessPub) });
+});
+app.post('/api/tool/decide', toolAuth, needDb, (req, res) => {
+  const b = req.body || {};
+  if (!['approve', 'deny'].includes(b.action) || typeof b.id !== 'string') return res.status(400).json({ error: 'Bad request.' });
+  req.params = { id: b.id }; req.decider = clean(b.by, 60) || 'Super Admin'; req.auditIp = clean(b.ip, 64); req.via = toolName(req.tool);
+  if (b.action === 'deny') return decide(req, res, ['pending'], 'denied');
+  const hours = [1, 12, 24, 168].includes(+b.hours) ? +b.hours : SETTINGS.defaultHours;
+  return decide(req, res, ['pending'], 'approved', { expires: new Date(Date.now() + hours * 3600 * 1000) });
+});
+app.get('/api/tool/events', toolAuth, openStream);
+const TOOL_EVENTS = ['owner.signin', 'owner.signin_failed', 'visitor.entered', 'gateway.link_entry'];
+app.post('/api/tool/log', toolAuth, needDb, async (req, res) => {
+  const b = req.body || {};
+  if (!TOOL_EVENTS.includes(b.action)) return res.status(400).json({ error: 'Unknown event.' });
+  await audit(b.action, { actor: b.actor, email: b.email, tool: req.tool, ip: b.ip, detail: b.detail });
+  res.json({ ok: true });
 });
 
 /* ---- Admin Console API (Super Admin only) ---- */
@@ -293,6 +388,7 @@ app.post('/api/users', admin, needDb, async (req, res) => {
   try {
     const r = await pool.query('INSERT INTO gw_users(username, display_name, password_hash, role, tools) VALUES($1,$2,$3,$4,$5) RETURNING *',
       [username, String(b.name || '').trim() || username, await hashPw(b.password), b.role === 'admin' ? 'admin' : 'user', JSON.stringify(cleanTools(b.tools))]);
+    audit('user.created', { actor: req.user.display_name || req.user.username, email: username, ip: req.ip, detail: (b.role === 'admin' ? 'Super Admin' : 'User') });
     res.json(pub(r.rows[0]));
   } catch (e) { res.status(e.code === '23505' ? 409 : 500).json({ error: e.code === '23505' ? 'That username already exists.' : 'Could not create the user.' }); }
 });
@@ -308,6 +404,7 @@ app.put('/api/users/:id', admin, needDb, async (req, res) => {
   if (b.password !== undefined && b.password !== '' && (typeof b.password !== 'string' || b.password.length < 8)) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
   const r = await pool.query('UPDATE gw_users SET display_name=$1, role=$2, active=$3, tools=$4, password_hash=$5 WHERE id=$6 RETURNING *',
     [b.name !== undefined ? String(b.name).trim() || cur.username : cur.display_name, role, active, JSON.stringify(b.tools !== undefined ? cleanTools(b.tools) : cur.tools), b.password ? await hashPw(b.password) : cur.password_hash, id]);
+  audit('user.updated', { actor: req.user.display_name || req.user.username, email: cur.username, ip: req.ip, detail: [b.password ? 'password reset' : '', typeof b.active === 'boolean' && b.active !== cur.active ? (b.active ? 'enabled' : 'disabled') : '', b.role && b.role !== cur.role ? 'role: ' + b.role : ''].filter(Boolean).join(', ') });
   res.json(pub(r.rows[0]));
 });
 app.delete('/api/users/:id', admin, needDb, async (req, res) => {
@@ -318,7 +415,9 @@ app.delete('/api/users/:id', admin, needDb, async (req, res) => {
     const left = (await pool.query("SELECT count(*)::int AS n FROM gw_users WHERE role='admin' AND active AND id <> $1", [id])).rows[0].n;
     if (!left) return res.status(400).json({ error: 'There must be at least one active Super Admin.' });
   }
-  await pool.query('DELETE FROM gw_users WHERE id = $1', [id]); res.json({ ok: true });
+  await pool.query('DELETE FROM gw_users WHERE id = $1', [id]);
+  audit('user.deleted', { actor: req.user.display_name || req.user.username, email: cur.username, ip: req.ip });
+  res.json({ ok: true });
 });
 
 app.use((req, res, next) => /^\/(server\.js|package(-lock)?\.json|node_modules|README\.md)/.test(req.path) ? res.status(404).end() : next());

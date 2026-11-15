@@ -16,11 +16,11 @@
     <div class="lg-bgs"><i class="on" style="background-image:url(/signin-1.jpg)"></i><i data-bg="/signin-2.jpg"></i><i data-bg="/signin-3.jpg"></i><i data-bg="/signin-4.jpg"></i><i data-bg="/signin-5.jpg"></i></div>
     <div class="lg-artbrand"><img src="logo.png" alt=""><b>ARC<span>+</span></b></div>
     <div class="lg-slides">
-      <div class="lg-slide on"><h2>One place for every tool</h2><p>Open Payroll and Inventory from a single dashboard.</p></div>
-      <div class="lg-slide"><h2>Your access, your tools</h2><p>Each person sees only the tools they have been given.</p></div>
-      <div class="lg-slide"><h2>Secure by design</h2><p>Sign in once, then launch tools with a short-lived token.</p></div>
-      <div class="lg-slide"><h2>One sign-in, every tool</h2><p>No more separate passwords to remember.</p></div>
-      <div class="lg-slide"><h2>Built for the way you work</h2><p>Simple enough to use on site, from any device.</p></div>
+      <div class="lg-slide on"><h2>Spaces designed around you</h2><p>ARC Design &amp; Construction Services turns ideas into interiors that feel like home.</p></div>
+      <div class="lg-slide"><h2>Crafted kitchens, built to last</h2><p>Warm timber, clean lines and careful finishing in every detail.</p></div>
+      <div class="lg-slide"><h2>Detail in every corner</h2><p>Considered planning and quality finishes, from tiles to fixtures.</p></div>
+      <div class="lg-slide"><h2>Bright, comfortable living</h2><p>Natural light, good proportions and thoughtful lighting.</p></div>
+      <div class="lg-slide"><h2>Smart design for compact homes</h2><p>Making every square metre work harder, without losing style.</p></div>
     </div>
     <div class="lg-dots"><button type="button" class="on" aria-label="Slide 1"></button><button type="button" class="" aria-label="Slide 2"></button><button type="button" class="" aria-label="Slide 3"></button><button type="button" class="" aria-label="Slide 4"></button><button type="button" class="" aria-label="Slide 5"></button></div>
   </aside>
@@ -33,7 +33,10 @@
       <label class="lg-field"><span>Password</span><input name="password" type="password" autocomplete="current-password" required></label>
       <button class="lg-btn" id="go">Sign in</button>
     </form>
-    <div class="lg-foot">Need access? Ask your administrator.</div>
+    <div id="pOk" class="lg-pane lg-ok" hidden>
+      <svg class="lg-check" viewBox="0 0 52 52" aria-hidden="true"><circle class="c" cx="26" cy="26" r="24"/><path class="t" d="M14 27l8 8 16-17"/></svg>
+      <h1>Welcome back</h1><p class="lg-sub">Opening the Gateway...</p><div class="lg-bar"><i></i></div>
+    </div>    <div class="lg-foot">Need access? Ask your administrator.</div>
   </section>
 </div>
 <script>
@@ -45,13 +48,22 @@
   function load() { b.forEach(function (e) { if (e.dataset.bg && !e.style.backgroundImage) e.style.backgroundImage = 'url(' + e.dataset.bg + ')'; }); }
   if (document.readyState === 'complete') load(); else addEventListener('load', load);
   go(0); run();
-})();const f = document.getElementById('f'), err = document.getElementById('err'), go = document.getElementById('go');
+})();function welcome() {
+  var card = document.querySelector('.lg-card'), rm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  ['f', 'err'].forEach(function (i) { document.getElementById(i).hidden = true; });
+  var h = document.querySelector('.lg-form > h1'); if (h) h.hidden = true;
+  document.getElementById('pOk').hidden = false; card.classList.add('lg-leaving');
+  try { sessionStorage.setItem('arc-just-signed', '1'); } catch (e) { }
+  setTimeout(function () { card.classList.add('lg-out'); }, rm ? 200 : 1750);
+  setTimeout(function () { location.replace('/'); }, rm ? 450 : 2100);
+}
+const f = document.getElementById('f'), err = document.getElementById('err'), go = document.getElementById('go');
 f.onsubmit = async e => {
   e.preventDefault(); err.textContent = ''; go.disabled = true;
   try {
     const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(new FormData(f))) });
     const j = await r.json().catch(() => ({}));
-    if (r.ok) location.href = '/'; else { err.textContent = j.error || 'Sign-in failed.'; go.disabled = false; }
+    if (r.ok) welcome(); else { err.textContent = j.error || 'Sign-in failed.'; go.disabled = false; }
   } catch (x) { err.textContent = 'Cannot reach the server. Check your connection.'; go.disabled = false; }
 };
 </script>

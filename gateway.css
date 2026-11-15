@@ -184,6 +184,24 @@ label.chk{flex-direction:row;align-items:center;gap:10px;color:var(--ink);font-w
   .lg-form{padding:32px 26px 40px;justify-content:flex-start}
 }
 
+/* success animation after signing in / being approved */
+.lg-card{transition:opacity .35s ease}.lg-card.lg-out{opacity:0}
+.lg-bgs i{transition:opacity 1.3s ease,transform 2.4s ease-out}
+.lg-card.lg-leaving .lg-bgs i.on{transform:scale(1.09)}
+.lg-card.lg-leaving .lg-slides,.lg-card.lg-leaving .lg-dots{opacity:0;transition:opacity .4s}
+.lg-ok{text-align:center}
+.lg-check{display:block;width:92px;height:92px;margin:0 auto 18px;transform-origin:center;animation:lgpop .5s .05s cubic-bezier(.2,1.4,.4,1) both}
+.lg-check .c{fill:none;stroke:#ffa203;stroke-width:2.5;stroke-dasharray:151;stroke-dashoffset:151;animation:lgdraw .7s .1s cubic-bezier(.65,0,.45,1) forwards}
+.lg-check .t{fill:none;stroke:#14110d;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:36;stroke-dashoffset:36;animation:lgdraw .45s .65s cubic-bezier(.65,0,.45,1) forwards}
+@keyframes lgdraw{to{stroke-dashoffset:0}}
+@keyframes lgpop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+.lg-ok h1{opacity:0;transform:translateY(10px);animation:lgup .5s .8s ease forwards}
+.lg-ok .lg-sub{opacity:0;transform:translateY(10px);animation:lgup .5s .95s ease forwards}
+@keyframes lgup{to{opacity:1;transform:none}}
+.lg-bar{height:4px;width:190px;margin:8px auto 0;background:#f1e6d3;border-radius:4px;overflow:hidden}
+.lg-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ffb52e,#e88f00);animation:lgfill 1.7s .3s ease-out forwards}
+@keyframes lgfill{to{width:100%}}
+@media (prefers-reduced-motion:reduce){.lg-check,.lg-check .c,.lg-check .t,.lg-bar i{animation-duration:.01s;animation-delay:0s}.lg-ok h1,.lg-ok .lg-sub{animation:none;opacity:1;transform:none}.lg-card.lg-leaving .lg-bgs i.on{transform:none}}
 /* keep the sign-in fields independent of the Admin Console form styles */
 body.lg-page .lg-field{gap:0;font-size:inherit;font-weight:inherit;color:inherit;margin-bottom:22px}
 body.lg-page .lg-field span{font-size:11.5px;font-weight:400;color:#9b9486;margin-bottom:2px}
@@ -234,3 +252,45 @@ label.search{flex-direction:row;align-items:center;gap:8px;font-weight:400;color
 .rt-act{display:flex;gap:8px;align-items:center;margin-top:12px}
 .rt-link{margin-left:auto;font-size:13px;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){.rtoast{animation:none}}
+
+/* ---------- collapsible sidebar, settings, pagination, activity log ---------- */
+#burger{display:grid}
+.app{transition:grid-template-columns .22s ease}
+nav a .lbl{white-space:nowrap}
+@media (min-width:901px){
+  html.collapsed .app{grid-template-columns:78px 1fr}
+  html.collapsed aside{padding:20px 10px;overflow-x:hidden}
+  html.collapsed .brand{justify-content:center;padding:4px 0 18px}
+  html.collapsed .brand div,html.collapsed .navlbl,html.collapsed nav a .lbl,html.collapsed .side-foot,html.collapsed .navnone{display:none}
+  html.collapsed nav a{justify-content:center;padding:12px 0;gap:0;position:relative;border-left-width:0}
+  html.collapsed nav a.on{box-shadow:inset 3px 0 0 var(--o)}
+  html.collapsed .nbadge{position:absolute;top:5px;right:9px;min-width:17px;height:17px;font-size:10px;padding:0 4px;margin:0}
+}
+.avatar.logo{background:#0a0a0a;padding:7px;border:1px solid var(--line)}
+.avatar.logo img{width:100%;height:100%;object-fit:contain;display:block}
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin:4px 0 22px}
+.tabs a{padding:10px 16px;color:var(--muted);text-decoration:none;font-weight:700;font-size:14px;border-bottom:3px solid transparent;margin-bottom:-1px}
+.tabs a:hover{color:var(--ink)}.tabs a.on{color:var(--ink);border-bottom-color:var(--o)}
+.setgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px;align-items:start}
+.setcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px}
+.setcard h2{margin:0;font-size:15.5px}
+.setcard p{margin:0}
+.sw{display:flex;gap:12px;align-items:flex-start;cursor:pointer;flex-direction:row;color:var(--ink);font-weight:500;font-size:14px}
+.sw input{appearance:none;-webkit-appearance:none;flex:none;width:42px;height:24px;border-radius:24px;background:var(--line);position:relative;cursor:pointer;margin-top:1px;transition:background .18s;border:0}
+.sw input::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .18s}
+.sw input:checked{background:var(--o)}.sw input:checked::after{transform:translateX(18px)}
+.sw-t b{display:block;font-size:14px}.sw-t small{display:block;color:var(--muted);font-size:12.5px;font-weight:400;margin-top:2px}
+.fld{display:flex;flex-direction:column;gap:6px}
+.fld select,.logbar select{height:40px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.pager{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+.pager .pgno{font-size:13px;color:var(--muted);min-width:90px;text-align:center}
+.pager button:disabled{opacity:.4;cursor:default}
+.logbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.lgsearch{min-width:260px;flex:1;max-width:420px}
+.btnlink{display:inline-flex;align-items:center;height:36px;padding:0 14px;border:1px solid var(--line);background:var(--panel);border-radius:7px;font-weight:600;color:var(--ink);text-decoration:none;font-size:14px}
+.btnlink:hover{border-color:var(--o)}
+.logtbl td,.logtbl th{padding:10px 14px;font-size:13px}
+.logtbl .nw{white-space:nowrap}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12.5px}
+.pill.bad{color:#b42318;border-color:#f0b4ac;background:rgba(192,57,43,.08)}
+.rc-ip{margin-left:auto;font-weight:500;font-size:11.5px;color:var(--muted);font-family:ui-monospace,Consolas,monospace}
+@media (max-width:900px){.setgrid{grid-template-columns:1fr}.lgsearch{max-width:none}}
