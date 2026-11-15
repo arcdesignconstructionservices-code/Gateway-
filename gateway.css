@@ -133,9 +133,11 @@ label.chk{flex-direction:row;align-items:center;gap:10px;color:var(--ink);font-w
 .lg-float{animation:lgbob 6s ease-in-out infinite}
 .lg-gear1{animation:lgspin 18s linear infinite}
 .lg-gear2{animation:lgspin 12s linear infinite reverse}
+.lg-swing{animation:lgsway 4.5s ease-in-out infinite alternate}
 @keyframes lgbob{50%{translate:0 -9px}}
 @keyframes lgspin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.lg-float,.lg-gear1,.lg-gear2{animation:none}}
+@keyframes lgsway{from{transform:rotate(-2.5deg)}to{transform:rotate(2.5deg)}}
+@media (prefers-reduced-motion:reduce){.lg-float,.lg-gear1,.lg-gear2,.lg-swing{animation:none}}
 
 .lg-slides{position:relative;min-height:7.2em;font-size:clamp(14px,1vw,17px);text-align:center}
 .lg-slide{position:absolute;inset:0;opacity:0;transform:translateY(8px);transition:opacity .3s,transform .3s;pointer-events:none}
