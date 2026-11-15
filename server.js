@@ -168,7 +168,10 @@ async function sessionUser(req) {
   const u = await findUser(s.u); return u && u.active ? u : null;
 }
 // everyone can reach the dashboard; if a valid admin session cookie is present we know who it is
-app.use(async (req, res, next) => { try { req.user = await sessionUser(req); } catch (e) { req.user = null; } next(); });
+/* OPEN MODE (default): no sign-in at all. Every visitor of the Gateway acts as the approver.
+   Set GATEWAY_OPEN=0 on the Gateway service to bring back the private approver link / admin sign-in. */
+const OPEN = process.env.GATEWAY_OPEN !== '0';
+app.use(async (req, res, next) => { try { req.user = await sessionUser(req); } catch (e) { req.user = null; } if (!req.user && OPEN) req.user = { ...APPROVER_USER, open: true }; next(); });
 
 app.post('/api/login', async (req, res) => {
   const ip = req.ip, { username, password } = req.body || {};
@@ -189,6 +192,7 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/logout', (req, res) => { setCookie(req, res, COOKIE, '', 0); setCookie(req, res, APPROVER_COOKIE, '', 0); res.json({ ok: true }); });
 const badLink = new Map();
 app.get('/approver', (req, res) => {
+  if (OPEN) return res.redirect('/requests');
   const a = Buffer.from(sha(String(req.query.key || ''))), b = Buffer.from(sha(APPROVER_KEY));
   if (!APPROVER_KEY || !crypto.timingSafeEqual(a, b)) {
     const last = badLink.get(req.ip) || 0;                                  // log failed attempts at most once a minute per IP
@@ -220,7 +224,7 @@ app.get('/launch/:id', (req, res) => {
   if (!t || !t.url) return res.status(404).send('That tool is not available yet.');
   if (!canOpen(req.user, t.id)) return res.status(403).send('You do not have access to this tool.');
   const base = t.url.replace(/\/$/, '');
-  if (!req.user || !SSO_SECRET) return res.redirect(base + '/');          // visitors go to the tool's own sign-in / Request access page
+  if (!req.user || req.user.open || !SSO_SECRET) return res.redirect(base + '/');          // visitors go to the tool's own sign-in / Request access page
   const token = sign({ t: t.id, sub: req.user.username, name: req.user.display_name || req.user.username, ap: ['admin', 'approver'].includes(req.user.role), exp: Date.now() + 60000 }, SSO_SECRET);
   res.redirect(`${base}/sso?token=${encodeURIComponent(token)}`);       // signed-in Gateway users go straight in
 });
@@ -339,7 +343,7 @@ app.get('/api/logs.csv', approver, needDb, async (req, res) => {
 /* ---- Settings (approvers) ---- */
 app.get('/api/settings', approver, (req, res) => {
   const origin = (req.headers['x-forwarded-proto'] || req.protocol) + '://' + req.get('host');
-  res.json({ ...SETTINGS, hasKey: !!APPROVER_KEY, approverLink: APPROVER_KEY ? origin + '/approver?key=' + APPROVER_KEY : '', db: dbReady });
+  res.json({ ...SETTINGS, hasKey: !!APPROVER_KEY, open: OPEN, approverLink: APPROVER_KEY ? origin + '/approver?key=' + APPROVER_KEY : '', db: dbReady });
 });
 app.put('/api/settings', approver, needDb, async (req, res) => {
   const b = req.body || {}, next = {};

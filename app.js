@@ -330,13 +330,13 @@ async function renderSettings() {
       ${sw('sAccept', S.acceptRequests, 'Accept new requests', 'Turn off to pause: visitors will see that requests are paused.')}
       <label class="fld">Default access length<select id="sHours">${[[1, '1 hour'], [12, '12 hours'], [24, '24 hours'], [168, '7 days']].map(([h, t]) => `<option value="${h}"${h === S.defaultHours ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
       <p class="muted">Used when you approve from the bell inside Payroll or Inventory, and as the preselected choice on the Access requests page.</p></section>
-    <section class="setcard"><h2>Approve from another device</h2>
+    ${S.open ? '<section class="setcard"><h2>Access to this page</h2><p class="muted">The Gateway is open: nobody needs to sign in, and anyone who opens this address can approve requests.</p></section>' : `<section class="setcard"><h2>Approve from another device</h2>
       ${S.hasKey ? `<p class="muted">Open this private link once on another phone or computer and it can approve requests too. Anyone who has it can approve, so keep it private.</p>
       <div class="pwrow"><input readonly id="sLink" value="${esc(S.approverLink)}"><button class="sm" id="sCopy">Copy</button></div>
-      <p class="muted">To sign out every approver device at once, change <b>APPROVER_KEY</b> on the Gateway service in Railway.</p>` : '<p class="muted">No approver link is configured (APPROVER_KEY is not set on the Gateway service).</p>'}</section>
-    <section class="setcard"><h2>This device</h2>
+      <p class="muted">To sign out every approver device at once, change <b>APPROVER_KEY</b> on the Gateway service in Railway.</p>` : '<p class="muted">No approver link is configured (APPROVER_KEY is not set on the Gateway service).</p>'}</section>`}
+    ${S.open ? '' : `<section class="setcard"><h2>This device</h2>
       <p class="muted">Signed in as <b>${esc(ME.name)}</b>. Stopping removes this device&rsquo;s approver access until you open the private link again.</p>
-      <button class="sm danger" id="sOut">Stop approving on this device</button></section></div>`;
+      <button class="sm danger" id="sOut">Stop approving on this device</button></section>`}</div>`;
   const put = async (patch, msg) => { try { const r = await api('/api/settings', { method: 'PUT', body: patch }); DEFAULT_HOURS = r.defaultHours; note(msg || 'Saved.'); } catch (e) { note(e.message, true); renderSettings(); } };
   $('#sSound').onchange = e => { setPref('sound', e.target.checked); note('Saved.'); if (e.target.checked) beep(); };
   $('#sPopup').onchange = e => { setPref('popup', e.target.checked); note('Saved.'); };
@@ -344,7 +344,7 @@ async function renderSettings() {
   $('#sAccept').onchange = e => put({ acceptRequests: e.target.checked }, e.target.checked ? 'Requests are being accepted.' : 'Requests are paused.');
   $('#sHours').onchange = e => put({ defaultHours: +e.target.value });
   if ($('#sCopy')) $('#sCopy').onclick = async () => { const i = $('#sLink'); try { await navigator.clipboard.writeText(i.value); note('Link copied.'); } catch (e) { i.select(); note('Press Ctrl+C to copy.'); } };
-  $('#sOut').onclick = async () => { if (!confirm('Stop approving on this device?')) return; try { await fetch('/api/logout', { method: 'POST' }); } catch (e) { } location.href = '/'; };
+  if ($('#sOut')) $('#sOut').onclick = async () => { if (!confirm('Stop approving on this device?')) return; try { await fetch('/api/logout', { method: 'POST' }); } catch (e) { } location.href = '/'; };
 }
 async function renderLogs() {
   const body = $('#setBody');
