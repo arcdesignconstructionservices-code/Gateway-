@@ -401,9 +401,9 @@ try { setCollapsed(localStorage.getItem(KEY + '-coll') === '1'); } catch (e) { }
 $('#burger').onclick = () => isPhone() ? document.documentElement.classList.toggle('navopen') : setCollapsed(!document.documentElement.classList.contains('collapsed'));
 addEventListener('keydown', e => { if (e.key === '[' && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) $('#burger').click(); });
 $('#scrim').onclick = () => document.documentElement.classList.remove('navopen');
-function setTheme(t) { document.documentElement.dataset.theme = t; try { localStorage.setItem(KEY + '-theme', t); } catch (e) { } }
-(function () { let t = 'light'; try { t = localStorage.getItem(KEY + '-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch (e) { } setTheme(t); })();
-$('#themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+function setTheme(t, keep) { document.documentElement.dataset.theme = t; if (keep) try { localStorage.setItem(KEY + '-theme-choice', t); } catch (e) { } }
+(function () { let t = 'light'; try { t = localStorage.getItem(KEY + '-theme-choice') || 'light'; } catch (e) { } setTheme(t); })();
+$('#themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark', true);
 $('#pwBtn').onclick = passwordDialog;
 $('#bellBtn').onclick = () => go('/requests');
 $('#outBtn').onclick = async () => { try { await fetch('/api/logout', { method: 'POST' }); } catch (e) { } location.href = '/'; };
