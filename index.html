@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ARC+ Gateway</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ffa203">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ARC+ Gateway">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="gateway.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="app">
+  <aside id="side">
+    <div class="brand"><img src="logo.png" alt="ARC+"><div><b>ARC+ Gateway</b><small>Internal portal</small></div></div>
+    <nav id="nav"></nav>
+    <div class="side-foot">ARC Design &amp; Construction Services</div>
+  </aside>
+  <div class="content">
+    <header class="topbar">
+      <button class="iconbtn" id="burger" aria-label="Toggle menu"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <div class="crumb"><b>ARC+ Gateway</b><small id="crumbSub">Internal portal</small></div>
+      <span class="spacer"></span>
+      <label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" placeholder="Search tools…" autocomplete="off"></label>
+      <button class="iconbtn" id="themeBtn" title="Switch light / dark" aria-label="Switch light / dark"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    </header>
+    <main id="view"></main>
+  </div>
+</div>
+<script src="tools.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
