@@ -28,6 +28,10 @@ if (!process.env.ADMIN_PASSWORD && process.env.APP_PASSWORD) process.env.ADMIN_P
 const SESSION_SECRET = process.env.SESSION_SECRET || process.env.SSO_SECRET || crypto.randomBytes(32).toString('hex');
 if (!process.env.SESSION_SECRET && !process.env.SSO_SECRET) console.warn('No SESSION_SECRET set — sessions reset on every restart.');
 const SSO_SECRET = process.env.SSO_SECRET || '';
+// Sign-in on the Gateway itself is OFF by default (the tools - Payroll, Inventory - have their own sign-in).
+// Set REQUIRE_LOGIN=1 on the Gateway service to turn the Gateway sign-in + Admin Console on.
+const AUTH_ON = process.env.REQUIRE_LOGIN === '1';
+const OPEN_USER = { id: -1, username: 'open', display_name: 'ARC+', role: 'user', tools: ['*'], active: true };
 const SESSION_MS = 12 * 3600 * 1000;
 const COOKIE = 'gw_session';
 
@@ -114,6 +118,7 @@ const fail = ip => { const t = tries.get(ip); if (!t || Date.now() - t.ts >= 600
 app.get('/api/health', (req, res) => res.json({ ok: true, db: dbReady }));
 
 app.post('/api/login', async (req, res) => {
+  if (!AUTH_ON) return res.status(404).json({ error: 'Sign-in is turned off on the Gateway.' });
   const ip = req.ip, { username, password } = req.body || {};
   if (limited(ip)) return res.status(429).json({ error: 'Too many attempts. Try again in a few minutes.' });
   if (typeof username !== 'string' || typeof password !== 'string' || !username || !password) return res.status(400).json({ error: 'Enter your username and password.' });
@@ -141,19 +146,19 @@ async function sessionUser(req) {
   const u = await findUser(s.u); return u && u.active ? u : null;
 }
 app.use(async (req, res, next) => {
+  if (!AUTH_ON) { req.user = OPEN_USER; return next(); }
   if (PUBLIC.test(req.path)) return next();
   try { req.user = await sessionUser(req); } catch (e) { req.user = null; }
   if (req.user) return next();
   if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Not signed in.' });
   res.redirect('/login');
 });
-app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
-app.get('/login.html', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
+app.get(['/login', '/login.html'], (req, res) => AUTH_ON ? res.sendFile(path.join(__dirname, 'login.html')) : res.redirect('/'));
 
 const canOpen = (u, id) => u.role === 'admin' || (u.tools || []).includes('*') || (u.tools || []).includes(id);
 app.get('/api/me', (req, res) => {
   const tools = loadTools().filter(t => canOpen(req.user, t.id)).map(t => t.id);
-  res.json({ ...pub(req.user), tools, dbReady });
+  res.json({ ...pub(req.user), tools, dbReady, authOff: !AUTH_ON });
 });
 
 app.get('/launch/:id', (req, res) => {
@@ -161,7 +166,7 @@ app.get('/launch/:id', (req, res) => {
   if (!t || !t.url) return res.status(404).send('That tool is not available yet.');
   if (!canOpen(req.user, t.id)) return res.status(403).send('You do not have access to this tool. Ask a Super Admin.');
   const base = t.url.replace(/\/$/, '');
-  if (!SSO_SECRET) return res.redirect(base + '/');
+  if (!AUTH_ON || !SSO_SECRET) return res.redirect(base + '/');
   const token = sign({ t: t.id, sub: req.user.username, name: req.user.display_name || req.user.username, exp: Date.now() + 60000 }, SSO_SECRET);
   res.redirect(`${base}/sso?token=${encodeURIComponent(token)}`);
 });
@@ -220,4 +225,4 @@ app.use(express.static(__dirname, { extensions: ['html'], index: 'index.html', d
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('ARC+ Gateway listening on port ' + PORT));
+app.listen(PORT, () => console.log('ARC+ Gateway listening on port ' + PORT + (AUTH_ON ? ' (sign-in ON)' : ' (open launcher: sign-in OFF)')));

@@ -159,6 +159,7 @@ $('#outBtn').onclick = async () => { try { await fetch('/api/logout', { method: 
     ME = await api('/api/me');
     const initials = (ME.name || ME.username).split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
     $('#uAvatar').textContent = initials; $('#uName').textContent = ME.name; $('#uRole').textContent = ME.role === 'admin' ? 'Super Admin' : 'User';
+    if (ME.authOff) { const u = document.querySelector('.user'); if (u) u.style.display = 'none'; }
     render();
   } catch (e) { /* api() already redirected to /login on 401 */ }
 })();
