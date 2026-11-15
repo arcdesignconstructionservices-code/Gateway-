@@ -447,7 +447,7 @@ app.delete('/api/users/:id', admin, needDb, async (req, res) => {
 });
 
 app.use((req, res, next) => /^\/(server\.js|package(-lock)?\.json|node_modules|README\.md)/.test(req.path) ? res.status(404).end() : next());
-app.use(express.static(__dirname, { extensions: ['html'], index: 'index.html', dotfiles: 'ignore' }));
+app.use(express.static(__dirname, { extensions: ['html'], index: 'index.html', dotfiles: 'ignore', setHeaders: (res, p) => { if (/\.(js|css|html)$/i.test(p)) res.setHeader('Cache-Control', 'no-cache'); } }));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.use((err, req, res, next) => { console.error(err); if (!res.headersSent) res.status(500).json({ error: 'Something went wrong.' }); });
 process.on('unhandledRejection', e => console.error('unhandledRejection', e));
