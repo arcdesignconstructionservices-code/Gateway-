@@ -216,7 +216,7 @@ app.get('/api/me', async (req, res) => {
   if (!req.user) return res.json({ signedIn: false, role: 'guest', name: 'Guest', tools, dbReady });
   let pending = 0;
   if (['admin', 'approver'].includes(req.user.role) && pool && dbReady) { try { pending = (await pool.query("SELECT count(*)::int AS n FROM gw_access WHERE status = 'pending'")).rows[0].n; } catch (e) { } }
-  res.json({ ...pub(req.user), signedIn: true, open: !!req.user.open, tools, dbReady, pending });
+  res.json({ ...pub(req.user), signedIn: true, open: OPEN, tools, dbReady, pending });
 });
 
 app.get('/launch/:id', (req, res) => {
