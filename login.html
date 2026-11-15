@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sign in — ARC+ Gateway</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<meta name="theme-color" content="#ffa203">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="gateway.css">
+</head>
+<body class="loginpage">
+<main class="logincard">
+  <img src="logo.png" alt="ARC+" class="loginlogo">
+  <h1>ARC+ Gateway</h1>
+  <p class="sub">Sign in to open your tools.</p>
+  <form id="f" autocomplete="on">
+    <label>Username<input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus></label>
+    <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+    <div class="err" id="err" role="alert"></div>
+    <button class="open" id="go">Sign in</button>
+  </form>
+  <small class="foot">ARC Design &amp; Construction Services</small>
+</main>
+<script>
+const f = document.getElementById('f'), err = document.getElementById('err'), go = document.getElementById('go');
+f.onsubmit = async e => {
+  e.preventDefault(); err.textContent = ''; go.disabled = true;
+  try {
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(new FormData(f))) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) location.href = '/'; else { err.textContent = j.error || 'Sign-in failed.'; go.disabled = false; }
+  } catch (x) { err.textContent = 'Cannot reach the server. Check your connection.'; go.disabled = false; }
+};
+</script>
+</body>
+</html>

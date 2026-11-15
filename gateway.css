@@ -84,3 +84,42 @@ h1{margin:0;font-size:25px;letter-spacing:-.4px}
   .crumb small{display:none}
   main{padding:20px 14px 50px}
 }
+
+/* ---------- sign-in, user chip, admin console ---------- */
+.muted{color:var(--muted);font-size:12.5px}
+.row{display:flex;align-items:center;gap:10px}
+.open.sm{flex:none;height:38px;padding:0 18px;font-size:14px}
+.navnone{display:block;padding:8px 12px;color:var(--side-muted);font-size:13px}
+.user{display:flex;align-items:center;gap:10px;padding-left:12px;margin-left:4px;border-left:1px solid var(--line)}
+.avatar{width:38px;height:38px;border-radius:50%;background:var(--o);color:#14110d;font-weight:800;display:grid;place-items:center;font-size:14px}
+.umeta b{display:block;font-size:14px;line-height:1.2}.umeta small{color:var(--muted);font-size:12px}
+.tbl{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow-x:auto;box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:11px;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted);padding:12px 16px;border-bottom:1px solid var(--line)}
+td{padding:13px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.r{text-align:right}
+.pill{display:inline-block;padding:3px 10px;border:1px solid var(--line);border-radius:20px;font-size:12px;color:var(--muted)}
+.pill.ok{color:#1f7a4d;border-color:#2fa66a}
+button.sm,button#dCancel,button.danger{height:36px;padding:0 14px;border:1px solid var(--line);background:var(--panel);border-radius:7px;cursor:pointer;font-weight:600}
+button.sm:hover,button#dCancel:hover{border-color:var(--o)}
+button.danger{color:#c0392b;border-color:#e3b4ae}
+dialog{border:1px solid var(--line);border-radius:12px;padding:0;background:var(--panel);color:var(--ink);width:min(480px,94vw);box-shadow:0 30px 80px -20px rgba(0,0,0,.5)}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+dialog form{padding:22px;display:flex;flex-direction:column;gap:14px}
+dialog h3{margin:0;font-size:18px}
+label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)}
+label input:not([type=checkbox]),label select{height:42px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-weight:500;outline:0}
+label input:focus,label select:focus{border-color:var(--o)}
+fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+legend{padding:0 6px;font-size:12px;font-weight:700;color:var(--muted)}
+label.chk{flex-direction:row;align-items:center;gap:10px;color:var(--ink);font-weight:500;font-size:14px}
+.err{color:#c0392b;font-size:13px;min-height:18px}
+.loginpage{display:grid;place-items:center;min-height:100vh;padding:20px;
+  background:radial-gradient(90% 60% at 10% 0%,rgba(255,162,3,.18),transparent 60%),var(--bg)}
+.logincard{width:min(400px,100%);background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--o);border-radius:12px;padding:32px 28px 24px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:6px;padding-bottom:22px}
+.loginlogo{width:84px;height:62px;object-fit:contain;background:#0a0a0a;border-radius:8px;padding:6px}
+.logincard form{display:flex;flex-direction:column;gap:14px;margin-top:8px}
+.logincard .open{flex:none;width:100%;cursor:pointer}
+.logincard .foot{color:var(--muted);text-align:center;margin-top:10px;font-size:12px}
+@media (max-width:900px){.umeta{display:none}.user{padding-left:8px}}
