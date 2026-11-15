@@ -218,11 +218,11 @@ async function loadRequests() {
 
 /* ---------- shell ---------- */
 function paintNav(route) {
-  const admin = ME.role === 'admin';
+  const admin = ME.role === 'admin', appr = admin || ME.role === 'approver';
   $('#nav').innerHTML = `<div class="navlbl">Workspace</div>
     <a href="#dashboard" class="${route === 'dashboard' ? 'on' : ''}">${svg('dash')}Gateway Dashboard</a>
-    ${admin ? `<a href="#requests" class="${route === 'requests' ? 'on' : ''}">${svg('bell')}Access requests<em class="nbadge" id="navBadge"${pendingCount ? '' : ' hidden'}>${pendingCount}</em></a>
-    <a href="#admin" class="${route === 'admin' ? 'on' : ''}">${svg('shield')}Admin Console</a>` : ''}
+    ${appr ? `<a href="#requests" class="${route === 'requests' ? 'on' : ''}">${svg('bell')}Access requests<em class="nbadge" id="navBadge"${pendingCount ? '' : ' hidden'}>${pendingCount}</em></a>`  : ''}
+    ${admin ? `<a href="#admin" class="${route === 'admin' ? 'on' : ''}">${svg('shield')}Admin Console</a>` : ''}
     <div class="navlbl">Tools</div>
     ${myTools().map(t => t.url
       ? `<a href="/launch/${esc(t.id)}" target="_blank" rel="noopener">${svg(t.icon)}${esc(t.name)}</a>`
@@ -232,7 +232,8 @@ function paintNav(route) {
 }
 function render() {
   const route = (location.hash.slice(1) || 'dashboard').split('/')[0];
-  const r = (route === 'admin' || route === 'requests') && ME.role !== 'admin' ? 'dashboard' : route;
+  const isAppr = ME.role === 'admin' || ME.role === 'approver';
+  const r = (route === 'admin' && ME.role !== 'admin') || (route === 'requests' && !isAppr) ? 'dashboard' : route;
   paintNav(r);
   $('#crumbSub').textContent = { admin: 'Admin console', requests: 'Access requests', mytools: 'My tools' }[r] || 'Internal portal';
   if (r === 'admin') renderAdmin(); else if (r === 'requests') renderRequests(); else renderTools(r === 'mytools');
@@ -251,15 +252,15 @@ $('#outBtn').onclick = async () => { try { await fetch('/api/logout', { method: 
 (async function boot() {
   try {
     ME = await api('/api/me');
-    const guest = !ME.signedIn, admin = ME.role === 'admin';
-    $('#signInBtn').hidden = !guest;
+    const guest = !ME.signedIn, admin = ME.role === 'admin', appr = admin || ME.role === 'approver';
     document.querySelector('.user').hidden = guest;
-    $('#bellBtn').hidden = !admin;
+    $('#bellBtn').hidden = !appr;
+    $('#pwBtn').hidden = ME.role === 'approver';
     if (!guest) {
       $('#uAvatar').textContent = initials(ME.name || ME.username);
-      $('#uName').textContent = ME.name; $('#uRole').textContent = admin ? 'Super Admin' : 'User';
+      $('#uName').textContent = ME.name; $('#uRole').textContent = admin ? 'Super Admin' : ME.role === 'approver' ? 'Approver' : 'User';
     }
-    if (admin) { setBadge(ME.pending || 0); live(); }
+    if (appr) { setBadge(ME.pending || 0); live(); }
     render();
   } catch (e) { /* api() redirects to /login when an admin page is opened without a session */ }
 })();

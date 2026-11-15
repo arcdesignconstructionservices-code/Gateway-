@@ -11,6 +11,7 @@
      ADMIN_PASSWORD  first Super Admin password, 8+ chars (APP_PASSWORD also works)
      SESSION_SECRET  random string that signs the Gateway session cookie
      SSO_SECRET      random string shared with Payroll + Inventory
+     APPROVER_KEY    secret for the private approver link  /approver?key=...  (open it once per device to approve requests)
      ACCESS_HOURS    how long an approved request lasts (default 12)
    ============================================================ */
 const express = require('express');
@@ -31,6 +32,11 @@ const SSO_SECRET = process.env.SSO_SECRET || '';
 const ACCESS_HOURS = Math.min(Math.max(parseInt(process.env.ACCESS_HOURS, 10) || 12, 1), 24 * 30);
 const SESSION_MS = 12 * 3600 * 1000;
 const COOKIE = 'gw_session';
+// Private approver link: /approver?key=APPROVER_KEY sets a cookie on that device so it can approve access requests (no username/password).
+const APPROVER_COOKIE = 'gw_approver';
+const APPROVER_KEY = process.env.APPROVER_KEY || '';
+const APPROVER_MS = 180 * 24 * 3600 * 1000;
+const APPROVER_USER = { id: -2, username: 'approver', display_name: 'Approver', role: 'approver', tools: ['*'], active: true };
 
 /* ---------- tools (shared with the front end) ---------- */
 function loadTools() {
@@ -134,7 +140,12 @@ const fail = ip => { const t = tries.get(ip); if (!t || Date.now() - t.ts >= 600
 app.get('/api/health', (req, res) => res.json({ ok: true, db: dbReady }));
 
 async function sessionUser(req) {
-  const s = verify(parseCookies(req)[COOKIE], SESSION_SECRET); if (!s) return null;
+  const ck = parseCookies(req);
+  const s = verify(ck[COOKIE], SESSION_SECRET);
+  if (!s) {                                           // not a signed-in admin: maybe an approver device?
+    const a = APPROVER_KEY ? verify(ck[APPROVER_COOKIE], SESSION_SECRET) : null;
+    return a && a.r === 'approver' && a.k === sha(APPROVER_KEY).slice(0, 16) ? APPROVER_USER : null;   // changing APPROVER_KEY signs out every approver device
+  }
   if (s.id === 0) {                                   // env-admin fallback session (database not connected)
     return !dbReady && process.env.ADMIN_USER && s.u === process.env.ADMIN_USER.toLowerCase()
       ? { id: 0, username: s.u, display_name: 'Super Admin', role: 'admin', tools: ['*'], active: true } : null;
@@ -159,11 +170,18 @@ app.post('/api/login', async (req, res) => {
     res.json({ ok: true });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Sign-in failed. Try again.' }); }
 });
-app.post('/api/logout', (req, res) => { setCookie(req, res, COOKIE, '', 0); res.json({ ok: true }); });
+app.post('/api/logout', (req, res) => { setCookie(req, res, COOKIE, '', 0); setCookie(req, res, APPROVER_COOKIE, '', 0); res.json({ ok: true }); });
+app.get('/approver', (req, res) => {
+  const a = Buffer.from(sha(String(req.query.key || ''))), b = Buffer.from(sha(APPROVER_KEY));
+  if (!APPROVER_KEY || !crypto.timingSafeEqual(a, b)) return res.status(404).send('Not found');
+  setCookie(req, res, APPROVER_COOKIE, sign({ r: 'approver', k: sha(APPROVER_KEY).slice(0, 16), exp: Date.now() + APPROVER_MS }, SESSION_SECRET), APPROVER_MS);
+  res.redirect('/#requests');
+});
 app.get(['/login', '/login.html'], (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
 
 const needUser = (req, res, next) => req.user ? next() : res.status(401).json({ error: 'Not signed in.' });
 const admin = (req, res, next) => !req.user ? res.status(401).json({ error: 'Not signed in.' }) : req.user.role === 'admin' ? next() : res.status(403).json({ error: 'Super Admin only.' });
+const approver = (req, res, next) => !req.user ? res.status(401).json({ error: 'Not signed in.' }) : ['admin', 'approver'].includes(req.user.role) ? next() : res.status(403).json({ error: 'Approvers only.' });
 const needDb = (req, res, next) => pool && dbReady ? next() : res.status(503).json({ error: 'The database is not connected.' });
 const canOpen = (u, id) => !u || u.role === 'admin' || (u.tools || []).includes('*') || (u.tools || []).includes(id);
 
@@ -171,7 +189,7 @@ app.get('/api/me', async (req, res) => {
   const tools = loadTools().filter(t => canOpen(req.user, t.id)).map(t => t.id);
   if (!req.user) return res.json({ signedIn: false, role: 'guest', name: 'Guest', tools, dbReady });
   let pending = 0;
-  if (req.user.role === 'admin' && pool && dbReady) { try { pending = (await pool.query("SELECT count(*)::int AS n FROM gw_access WHERE status = 'pending'")).rows[0].n; } catch (e) { } }
+  if (['admin', 'approver'].includes(req.user.role) && pool && dbReady) { try { pending = (await pool.query("SELECT count(*)::int AS n FROM gw_access WHERE status = 'pending'")).rows[0].n; } catch (e) { } }
   res.json({ ...pub(req.user), signedIn: true, tools, dbReady, pending });
 });
 
@@ -187,7 +205,7 @@ app.get('/launch/:id', (req, res) => {
 
 app.post('/api/password', needUser, async (req, res) => {
   const { current, next } = req.body || {};
-  if (!pool || !dbReady || req.user.id === 0) return res.status(400).json({ error: 'Password changes need the database account.' });
+  if (!pool || !dbReady || req.user.id <= 0) return res.status(400).json({ error: 'Password changes need the database account.' });
   if (typeof next !== 'string' || next.length < 8) return res.status(400).json({ error: 'New password must be at least 8 characters.' });
   if (!(await checkPw(String(current || ''), req.user.password_hash))) return res.status(400).json({ error: 'Current password is wrong.' });
   await pool.query('UPDATE gw_users SET password_hash = $1 WHERE id = $2', [await hashPw(next), req.user.id]);
@@ -238,7 +256,7 @@ app.get('/api/tool/access/:id/valid', toolAuth, needDb, async (req, res) => {   
 });
 
 /* ---- admins: see, approve, deny, revoke, live feed ---- */
-app.get('/api/access', admin, needDb, async (req, res) => {
+app.get('/api/access', approver, needDb, async (req, res) => {
   const rows = (await pool.query("SELECT * FROM gw_access WHERE status <> 'superseded' ORDER BY (status = 'pending') DESC, created_at DESC LIMIT 100")).rows;
   res.json(rows.map(accessPub));
 });
@@ -251,13 +269,13 @@ async function decide(req, res, from, to, extra) {
   broadcast('update', accessPub(r));
   res.json(accessPub(r));
 }
-app.post('/api/access/:id/approve', admin, needDb, (req, res) => {
+app.post('/api/access/:id/approve', approver, needDb, (req, res) => {
   const hours = [1, 12, 24, 168].includes(+((req.body || {}).hours)) ? +req.body.hours : ACCESS_HOURS;
   return decide(req, res, ['pending'], 'approved', { expires: new Date(Date.now() + hours * 3600 * 1000) });
 });
-app.post('/api/access/:id/deny', admin, needDb, (req, res) => decide(req, res, ['pending'], 'denied'));
-app.post('/api/access/:id/revoke', admin, needDb, (req, res) => decide(req, res, ['approved'], 'revoked'));
-app.get('/api/events', admin, (req, res) => {
+app.post('/api/access/:id/deny', approver, needDb, (req, res) => decide(req, res, ['pending'], 'denied'));
+app.post('/api/access/:id/revoke', approver, needDb, (req, res) => decide(req, res, ['approved'], 'revoked'));
+app.get('/api/events', approver, (req, res) => {
   res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
   res.flushHeaders && res.flushHeaders();
   res.write('retry: 3000\n\nevent: hello\ndata: {}\n\n');
