@@ -14,7 +14,7 @@ const GATEWAY_TOOLS = [
     name: 'ARC+ Payroll',
     desc: 'Weekly payroll, employees, cash advances, payslips and payroll history with Excel export.',
     group: 'Payroll',
-    url: 'https://payroll-production-d6f1.up.railway.app',
+    url: 'https://payroll.arcdesignconstructions.com',
     icon: 'payroll'
   },
   {
