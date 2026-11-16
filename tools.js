@@ -24,5 +24,13 @@ const GATEWAY_TOOLS = [
     group: 'Operations',
     url: 'https://inventory.arcdesignconstructions.com',
     icon: 'inventory'
+  },
+  {
+    id: 'procurement',
+    name: 'ARC+ Procurement',
+    desc: 'Budget requests, purchase orders and liquidations: auto-numbered, approved, printed and exported to Excel.',
+    group: 'Finance',
+    url: 'https://procurement-and-financial-transaction-documents-production.up.railway.app',
+    icon: 'doc'
   }
 ];
