@@ -99,7 +99,7 @@ function renderDashboard() {
       <div class="hero-in">
         <div class="hero-clock"><b id="hClock"></b><span id="hDate"></span></div>
         <h1>${greeting()}${first ? ', ' + esc(first) : ''}.</h1>
-        <p>Everything ARC Design &amp; Construction Services runs on, in one place.</p>
+        <p>Everything ARC+ runs on, in one place.</p>
         <div class="hero-act">${myTools().filter(t => t.url).map(t => `<a class="open" href="/launch/${esc(t.id)}" target="_blank" rel="noopener">${esc(t.name)} ${svg('open')}</a>`).join('')}
         ${appr ? `<a class="ghost" href="/requests"><i class="ping"></i><span id="hPend">${pendingCount ? pendingCount + ' waiting for approval' : 'No requests waiting'}</span></a>` : ''}</div>
       </div>
