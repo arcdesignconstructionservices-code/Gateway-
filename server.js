@@ -168,11 +168,20 @@ async function sessionUser(req) {
   }
   const u = await findUser(s.u); return u && u.active ? u : null;
 }
-// everyone can reach the dashboard; if a valid admin session cookie is present we know who it is
-/* SIGN-IN (default): visitors see the tools; approvers and admins sign in (/login) or use the private approver link.
+// who is this? an admin session cookie or the approver cookie identifies them
+/* SIGN-IN (default): everyone signs in (/login) or uses the private approver link.
    OPEN MODE (opt-in): set GATEWAY_OPEN=1 on the Gateway service and every visitor acts as the approver, no sign-in. */
 const OPEN = process.env.GATEWAY_OPEN === '1';
 app.use(async (req, res, next) => { try { req.user = await sessionUser(req); } catch (e) { req.user = null; } if (!req.user && OPEN) req.user = { ...APPROVER_USER, open: true }; next(); });
+/* The gate: nobody sees the Gateway (dashboard, tools, requests, settings) without signing in. Only the sign-in
+   and password-reset pages, what they need to draw, the private approver link, the health check and the tools'
+   own server-to-server calls (they carry their own signed token) are reachable without a session. */
+const OPEN_PATHS = /^\/(login|login\.html|reset|reset\.html|approver|gateway\.css|favicon\.png|logo\.png|logo_dark\.png|apple-touch-icon\.png|signin-\d\.jpg|api\/(health|login|forgot|reset|reset\/check|tool\/.*))$/;
+app.use((req, res, next) => {
+  if (req.user || OPEN_PATHS.test(req.path)) return next();
+  if (req.path.startsWith('/api/') || req.path.startsWith('/launch/')) return res.status(401).json({ error: 'Not signed in.' });
+  res.redirect('/login');
+});
 
 app.post('/api/login', async (req, res) => {
   const ip = req.ip, { username, password } = req.body || {};

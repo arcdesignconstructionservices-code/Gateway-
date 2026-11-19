@@ -91,7 +91,7 @@ async function loadDashLive() {
 function renderDashboard() {
   clearInterval(heroTimer); clearInterval(clockTimer);
   const appr = ME.role === 'admin' || ME.role === 'approver', tools = myTools().filter(match);
-  const first = ME.signedIn && ME.role !== 'approver' ? ME.name.split(' ')[0] : '';
+  const first = ME.signedIn && ME.role !== 'approver' && !/^super admin$/i.test(ME.name) ? ME.name.split(' ')[0] : '';
   const kpi = (id, label, sub, n, cls) => `<div class="kpi ${cls || ''}"><div class="kv" id="${id}" data-count="${n}">0</div><div class="kl">${label}</div><small>${sub}</small></div>`;
   $('#view').innerHTML = `
     <section class="hero">

@@ -5,8 +5,10 @@
      2. set APP_VERSION to the same version (and package.json "version")
    Entry shape:  { v, date, title, new:[...], improved:[...], fixed:[...] }
    ============================================================ */
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.6.1';
 const APP_CHANGELOG = [
+  { v: '1.6.1', date: '2026-11-19', title: 'Sign-in is required',
+    improved: ['The Gateway now shows nothing until you sign in: visitors and signed-out people go straight to the sign-in page.', 'Sign out moved to the bottom of the sidebar, like the other ARC+ apps.'] },
   { v: '1.6.0', date: '2026-11-19', title: 'Change password and Forgot password',
     new: ['Change password in Settings.', 'Forgot password? on the sign-in page: one click emails a link to the ARC email to choose a new password. The link works once and expires in 30 minutes.'],
     improved: ['Password changes and resets are recorded in the activity log.'] },
