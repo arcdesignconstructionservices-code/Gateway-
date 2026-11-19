@@ -129,8 +129,11 @@ async function audit(action, o = {}) {
   try {
     await pool.query('INSERT INTO gw_log(action, actor, email, tool, ip, detail) VALUES($1,$2,$3,$4,$5,$6)', [action, clean(o.actor, 80), clean(o.email, 120), clean(o.tool, 40), clean(o.ip, 64), clean(o.detail, 300)]);
     if (Math.random() < 0.02) await pool.query("DELETE FROM gw_log WHERE ts < now() - interval '365 days'");
+    if (NOTIFY_ACTIONS.has(action)) broadcast('notify', { action, actor: clean(o.actor, 80), email: clean(o.email, 120), ip: clean(o.ip, 64), detail: clean(o.detail, 300), ts: Date.now() });   // shows in the header bell
   } catch (e) { console.error('audit failed:', e.message); }
 }
+/* events that appear in the header bell (new access requests have their own pop-up and "waiting" line) */
+const NOTIFY_ACTIONS = new Set(['password.changed', 'password.reset_requested', 'password.reset_done', 'approver.link_opened', 'gateway.signin', 'gateway.signin_failed', 'user.created', 'user.updated', 'user.deleted', 'settings.changed', 'request.approved', 'request.denied', 'request.revoked']);
 const pub = u => ({ id: u.id, username: u.username, name: u.display_name || u.username, role: u.role, tools: u.tools, active: u.active, created_at: u.created_at });
 async function findUser(username) {
   if (pool && dbReady) return (await pool.query('SELECT * FROM gw_users WHERE username = $1', [String(username).toLowerCase()])).rows[0] || null;

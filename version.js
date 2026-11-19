@@ -5,8 +5,11 @@
      2. set APP_VERSION to the same version (and package.json "version")
    Entry shape:  { v, date, title, new:[...], improved:[...], fixed:[...] }
    ============================================================ */
-const APP_VERSION = '1.6.1';
+const APP_VERSION = '1.7.0';
 const APP_CHANGELOG = [
+  { v: '1.7.0', date: '2026-11-19', title: 'Notifications in the bell',
+    new: ['The bell now lists what happened: password changes and resets, sign-ins and failed sign-ins, approvals, declines and revocations, user and settings changes.', 'New events appear live with a short message and a number on the bell; opening the bell marks them as read.'],
+    improved: ['Changing your password shows a message in the corner instead of a browser pop-up.', 'Refresh button in the header: a hard refresh that fetches everything fresh.'] },
   { v: '1.6.1', date: '2026-11-19', title: 'Sign-in is required',
     improved: ['The Gateway now shows nothing until you sign in: visitors and signed-out people go straight to the sign-in page.', 'Sign out moved to the bottom of the sidebar, like the other ARC+ apps.'] },
   { v: '1.6.0', date: '2026-11-19', title: 'Change password and Forgot password',

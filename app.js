@@ -178,8 +178,8 @@ function passwordDialog() {
     <div class="err" id="dErr"></div>
     <div class="row"><span class="spacer"></span><button type="button" id="dCancel">Cancel</button><button class="open sm">Save</button></div>`;
   $('#dCancel').onclick = () => d.close();
-  f.onsubmit = async ev => { ev.preventDefault(); const fd = new FormData(f);
-    try { await api('/api/password', { method: 'POST', body: { current: fd.get('current'), next: fd.get('next') } }); d.close(); alert('Password changed.'); }
+  f.onsubmit = async ev => { ev.preventDefault(); const fd = new FormData(f); pwJustChanged = Date.now();   // the live event can arrive before the answer: do not show it twice
+    try { await api('/api/password', { method: 'POST', body: { current: fd.get('current'), next: fd.get('next') } }); d.close(); note('Password changed.'); }
     catch (e) { $('#dErr').textContent = e.message; } };
   d.showModal();
 }
@@ -192,12 +192,45 @@ const ago = ts => { const s = Math.max(1, Math.round((Date.now() - new Date(ts))
 const when = ts => ts ? new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
 const isReqPage = () => routeParts()[0] === 'requests';
 
-function setBadge(n) {
-  pendingCount = Math.max(0, n);
-  const b = $('#bellBadge'); if (b) { b.textContent = pendingCount > 9 ? '9+' : pendingCount; b.hidden = !pendingCount; }
+/* ---------- Header bell: waiting requests + recent events (password changes, sign-ins, approvals ...) ---------- */
+let notifs = [], notifSeen = 0, pwJustChanged = 0;
+try { notifSeen = +localStorage.getItem(KEY + '-notif-seen') || 0; } catch (e) { }
+const NOTABLE = ['password.changed', 'password.reset_requested', 'password.reset_done', 'approver.link_opened', 'gateway.signin', 'gateway.signin_failed', 'user.created', 'user.updated', 'user.deleted', 'settings.changed', 'request.approved', 'request.denied', 'request.revoked'];
+const unreadN = () => notifs.filter(n => n.ts > notifSeen).length;
+function setBadge(n) { pendingCount = Math.max(0, n); paintBadge(); }
+function paintBadge() {
+  const total = pendingCount + unreadN();
+  const b = $('#bellBadge'); if (b) { b.textContent = total > 9 ? '9+' : total; b.hidden = !total; }
   const nb = $('#navBadge'); if (nb) { nb.textContent = pendingCount; nb.hidden = !pendingCount; }
-  document.title = (pendingCount ? '(' + pendingCount + ') ' : '') + 'ARC+ Gateway';
+  document.title = (total ? '(' + total + ') ' : '') + 'ARC+ Gateway';
 }
+async function loadNotifs() {
+  try { const d = await api('/api/logs?page=1&size=40'); notifs = d.items.filter(r => NOTABLE.includes(r.action)).slice(0, 15).map(r => ({ action: r.action, actor: r.actor, email: r.email, ip: r.ip, detail: r.detail, ts: new Date(r.ts).getTime() })); paintBadge(); } catch (e) { }
+}
+function notifDd() {
+  let d = $('#notifdd');
+  if (!d) { d = document.createElement('div'); d.id = 'notifdd'; d.className = 'notifdd'; d.hidden = true; document.body.appendChild(d); }
+  return d;
+}
+function paintNotifs() {
+  const d = notifDd(); if (d.hidden) return;
+  const items = notifs.map(n => { const e = (typeof EV !== 'undefined' && EV[n.action]) || [n.action, '']; const who = [n.actor, n.email, n.ip].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(' · ');
+    return `<a class="ni ${n.ts > notifSeen ? 'new' : ''}" href="/settings/activity"><i class="dot ${e[1]}"></i><div><b>${esc(e[0])}</b><small>${esc(who)}${n.detail ? (who ? ' — ' : '') + esc(n.detail) : ''}</small></div><time>${esc(ago(n.ts))}</time></a>`; }).join('');
+  d.innerHTML = `<div class="nh">Notifications<span class="cnt">${pendingCount + unreadN()}</span></div>
+    <div class="nlist">${pendingCount ? `<a class="ni req" href="/requests"><i class="dot warn"></i><div><b>${pendingCount} access request${pendingCount > 1 ? 's' : ''} waiting</b><small>Open to approve or deny</small></div><time>now</time></a>` : ''}${items || (pendingCount ? '' : '<div class="nnone">Nothing new.</div>')}</div>
+    <a class="nfoot" href="/settings/activity">See all activity</a>`;
+}
+function markNotifsRead() { notifSeen = Date.now(); try { localStorage.setItem(KEY + '-notif-seen', String(notifSeen)); } catch (e) { } }
+async function toggleNotif() {
+  const d = notifDd();
+  if (!d.hidden) { d.hidden = true; return; }
+  const r = $('#bellBtn').getBoundingClientRect(); d.style.top = (r.bottom + 8) + 'px'; d.style.right = Math.max(8, innerWidth - r.right) + 'px';
+  d.hidden = false; paintNotifs();
+  await loadNotifs(); paintNotifs();                 // fresh list, then everything shown counts as read
+  setTimeout(() => { if (!d.hidden) { markNotifsRead(); paintBadge(); } }, 1200);
+}
+addEventListener('click', e => { const d = $('#notifdd'); if (d && !d.hidden && !e.target.closest('#notifdd') && !e.target.closest('#bellBtn')) d.hidden = true; else if (d && !d.hidden && e.target.closest('#notifdd a')) d.hidden = true; });
+addEventListener('keydown', e => { if (e.key === 'Escape') { const d = $('#notifdd'); if (d) d.hidden = true; } });
 function beep() {
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
@@ -241,6 +274,13 @@ function live() {
   es = new EventSource('/api/events');
   es.addEventListener('hello', () => { refreshPending(); onLive(); });
   es.addEventListener('request', ev => { const r = JSON.parse(ev.data); setBadge(pendingCount + 1); popup(r); if (pref('sound')) beep(); onLive(); });
+  es.addEventListener('notify', ev => {                      // an event that belongs in the bell
+    const n = JSON.parse(ev.data); notifs.unshift(n); notifs.length = Math.min(notifs.length, 15);
+    const d = $('#notifdd'); if (d && !d.hidden) markNotifsRead();
+    paintBadge(); paintNotifs();
+    if (!(n.action === 'password.changed' && Date.now() - pwJustChanged < 8000)) { const e = (typeof EV !== 'undefined' && EV[n.action]) || [n.action, '']; note(e[0] + (n.actor ? ' · ' + n.actor : ''), e[1] === 'bad'); }
+    if (isActivity()) loadLogs();
+  });
   es.addEventListener('update', ev => {
     const r = JSON.parse(ev.data);
     document.querySelectorAll('.rtoast[data-id="' + r.id + '"]').forEach(e => e.remove());
@@ -408,7 +448,16 @@ function setTheme(t, keep) { document.documentElement.dataset.theme = t; if (kee
 (function () { let t = 'light'; try { t = localStorage.getItem(KEY + '-theme-choice') || 'light'; } catch (e) { } setTheme(t); })();
 $('#themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark', true);
 $('#pwBtn').onclick = passwordDialog;
-$('#bellBtn').onclick = () => go('/requests');
+/* Refresh button: a hard refresh. Re-downloads the page and its scripts and styles (ignoring what the browser
+   kept), clears any cached copies, then reloads. */
+$('#refreshBtn').onclick = async () => {
+  const b = $('#refreshBtn'); b.classList.add('spin'); b.disabled = true;
+  try {
+    await Promise.all(['/', '/app.js', '/tools.js', '/version.js', '/gateway.css'].map(u => fetch(u, { cache: 'reload' }).catch(() => { })));
+    if (window.caches) { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); }
+  } catch (e) { }
+  location.reload();
+};$('#bellBtn').onclick = e => { e.stopPropagation(); toggleNotif(); };
 $('#outBtn').onclick = async () => { try { await fetch('/api/logout', { method: 'POST' }); } catch (e) { } location.href = '/'; };
 
 (async function boot() {
@@ -423,7 +472,7 @@ $('#outBtn').onclick = async () => { try { await fetch('/api/logout', { method: 
       const av = $('#uAvatar'); av.classList.add('logo'); av.innerHTML = '<img src="logo.png" alt="">';
       $('#uName').textContent = ME.name; $('#uRole').textContent = ME.role === 'approver' ? 'ARC+ Gateway' : admin ? 'Super Admin' : 'User';
     }
-    if (appr) { setBadge(ME.pending || 0); live(); api('/api/settings').then(s => { DEFAULT_HOURS = s.defaultHours; }).catch(() => { }); }
+    if (appr) { setBadge(ME.pending || 0); loadNotifs(); live(); api('/api/settings').then(s => { DEFAULT_HOURS = s.defaultHours; }).catch(() => { }); }
     render();
   } catch (e) { /* api() redirects to /login when an admin page is opened without a session */ }
 })();
