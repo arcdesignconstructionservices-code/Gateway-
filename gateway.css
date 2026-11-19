@@ -364,3 +364,37 @@ nav a .lbl{white-space:nowrap}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 #burger{border:0;background:transparent;box-shadow:none;outline:0}#burger:hover{background:rgba(255,162,3,.12)}#burger:focus-visible{outline:2px solid var(--o);outline-offset:2px}
 .gal{grid-template-columns:repeat(4,1fr)}.gal figure,.gal figure:nth-child(n+4){grid-column:auto}.panel.wide .gal{grid-template-columns:repeat(4,1fr)}@media (max-width:900px){.gal{grid-template-columns:repeat(2,1fr)}}
+
+/* ===== Version button + "What's new" (same as the other ARC+ apps) ===== */
+.verbtn{margin-top:auto;width:100%;display:flex;align-items:center;gap:10px;justify-content:flex-start;padding:10px 14px;background:rgba(255,255,255,.04);border:1px solid #242424;color:var(--side-muted);font-size:12.5px;font-weight:700;cursor:pointer;border-radius:0;transition:color .2s,border-color .2s,background .2s}
+.verbtn:hover{color:#fff;border-color:var(--o);background:rgba(255,162,3,.1)}
+.verbtn .vtag{background:var(--o);color:#000;padding:2px 8px;font-weight:800;font-size:11.5px;letter-spacing:.3px}
+.verbtn .vdot{margin-left:auto;width:9px;height:9px;background:var(--o3);border-radius:50%;animation:vping 1.6s infinite}
+@keyframes vping{0%{box-shadow:0 0 0 0 rgba(255,122,0,.7)}100%{box-shadow:0 0 0 9px rgba(255,122,0,0)}}
+@media (min-width:901px){html.collapsed .verbtn{justify-content:center;padding:10px 4px}html.collapsed .verbtn .vtxt{display:none}html.collapsed .verbtn .vtag{font-size:10px;padding:2px 5px}html.collapsed .verbtn .vdot{position:absolute;top:5px;right:5px;margin:0;width:7px;height:7px}html.collapsed .verbtn{position:relative}}
+dialog.ver{width:min(560px,94vw);max-height:90vh;max-height:90dvh;border:0;padding:0;background:var(--panel);color:var(--ink);display:none;flex-direction:column;overflow:hidden;border-radius:14px}
+dialog.ver[open]{display:flex}
+dialog.ver::backdrop{background:rgba(0,0,0,.62);backdrop-filter:blur(5px)}
+.v-head{display:flex;align-items:center;gap:14px;padding:18px 22px;background:#0a0a0a;color:#fff;border-bottom:3px solid var(--o);flex:none}
+.v-head b{display:block;font-size:18px;letter-spacing:-.3px}.v-head small{color:#a8a299;font-size:12.5px}.v-head strong{color:var(--o)}
+.v-x{margin-left:auto;border:0;background:none;color:#fff;font-size:28px;line-height:1;padding:0 6px;min-width:0;cursor:pointer}
+.v-x,.v-x:hover{border:0!important;background:none!important;box-shadow:none!important;border-radius:0}.v-x:hover{color:var(--o)}
+.v-body{padding:22px 22px 8px;overflow-y:auto;flex:1;min-height:0}
+.vrel{position:relative;padding:0 0 26px 26px}
+.vrel::before{content:"";position:absolute;left:5px;top:8px;bottom:-4px;width:2px;background:var(--line)}
+.vrel:last-child::before{display:none}
+.vrel::after{content:"";position:absolute;left:0;top:5px;width:12px;height:12px;background:var(--panel);border:2px solid var(--muted);border-radius:50%}
+.vrel.latest::after{background:var(--o);border-color:var(--o);box-shadow:0 0 0 4px rgba(255,162,3,.25)}
+.vmeta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.vnum{font:800 15px ui-monospace,Consolas,monospace}
+.vdate{margin-left:auto;color:var(--muted);font-size:12px;font-weight:600}
+.vbadge{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:4px}
+.vbadge.cur{background:var(--ink);color:var(--bg)}.vbadge.nw{background:var(--o);color:#000}
+.vrel h4{margin:6px 0 10px;font-size:15.5px;letter-spacing:-.2px}
+.vsec{margin:0 0 10px}
+.vlab{display:inline-block;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;padding:2px 8px;margin-bottom:5px;background:rgba(18,161,80,.14);color:#12a150;border-radius:4px}
+.vsec.i .vlab{background:rgba(255,162,3,.16);color:var(--o3)}.vsec.f .vlab{background:rgba(226,59,59,.13);color:#e23b3b}
+.vsec ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.5}.vsec li{margin:2px 0}
+.v-foot{display:flex;align-items:center;gap:12px;padding:14px 22px;border-top:1px solid var(--line);background:var(--bg);flex:none;font-size:12px}
+.v-foot .muted{color:var(--muted)}.v-foot .spacer{flex:1}
+@media (max-width:640px){.v-head{padding:16px}.v-body{padding:18px 16px 4px}.v-foot{padding:12px 16px}.v-foot .muted{display:none}.v-foot .open{width:100%;justify-content:center}}
