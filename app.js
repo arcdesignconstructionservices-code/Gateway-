@@ -109,7 +109,7 @@ function renderDashboard() {
       ${appr ? kpi('kPend', 'Waiting', 'requests to review', 0, 'warm') + kpi('kApp', 'Approved', 'in the last 24 h', 0) + kpi('kIn', 'Entries', 'in the last 24 h', 0) + kpi('kFail', 'Failed sign-ins', 'in the last 24 h', 0, 'bad') : ''}
     </div>
     <div class="sect"><h2>Your tools</h2><span class="muted">Each one opens in a new tab.</span></div>
-    ${tools.length ? `<div class="grid" style="--n:${tools.length}">${tools.map((t, i) => card(t).replace('<article class="card"', `<article class="card rise" style="--i:${i}"`).replace(/<span class="status([^"]*)"><i><\/i>(Active|Coming soon)<\/span>/, (m, c, w) => w === 'Active' ? `<span class="status" data-st="${esc(t.id)}"><i></i>Checking…</span>` : m)).join('')}</div>`
+    ${tools.length ? `<div class="grid" style="--n:${Math.max(4, tools.length)}">${tools.map((t, i) => card(t).replace('<article class="card"', `<article class="card rise" style="--i:${i}"`).replace(/<span class="status([^"]*)"><i><\/i>(Active|Coming soon)<\/span>/, (m, c, w) => w === 'Active' ? `<span class="status" data-st="${esc(t.id)}"><i></i>Checking…</span>` : m)).join('')}${!query.trim() ? Array.from({ length: Math.max(0, 4 - tools.length) }, () => `<article class="card soon-card rise"><div class="tico">${svg('doc')}</div><h3>More tools coming</h3><p>New ARC+ tools will appear here as they are added.</p></article>`).join('') : ''}</div>`
       : `<div class="empty">${!myTools().length ? 'You have no tools yet.' : 'No tools match your search.'}</div>`}
 `;
   $('#view').querySelectorAll('[data-fav]').forEach(b => b.onclick = () => { const id = b.dataset.fav; favs = isFav(id) ? favs.filter(x => x !== id) : [...favs, id]; saveFavs(); b.classList.toggle('on', isFav(id)); });
@@ -412,7 +412,7 @@ $('#outBtn').onclick = async () => { try { await fetch('/api/logout', { method: 
   try {
     ME = await api('/api/me');
     const guest = !ME.signedIn, admin = ME.role === 'admin', appr = admin || ME.role === 'approver';
-    document.querySelector('.user').hidden = guest;
+    document.querySelector('.user').hidden = guest; $('#inBtn').hidden = !guest;
     $('#bellBtn').hidden = !appr;
     $('#pwBtn').hidden = ME.role === 'approver';
     $('#outBtn').hidden = !!ME.open;

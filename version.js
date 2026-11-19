@@ -5,8 +5,11 @@
      2. set APP_VERSION to the same version (and package.json "version")
    Entry shape:  { v, date, title, new:[...], improved:[...], fixed:[...] }
    ============================================================ */
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 const APP_CHANGELOG = [
+  { v: '1.5.0', date: '2026-11-19', title: 'Sign in and sign out are back',
+    new: ['Sign in button in the header for admins and approvers, and Sign out once you are in.', 'A fourth card on the dashboard: always at least four, with a \u201CMore tools coming\u201D tile when there are fewer tools.'],
+    improved: ['Visitors see the tools and open them as before; Settings, Access requests and the activity log need an approver or admin.'] },
   { v: '1.4.0', date: '2026-11-19', title: 'Procurement, wider dashboard and ARC+ wording',
     new: ['ARC+ Procurement is on the dashboard, with its own Online / Offline status.', 'What\u2019s new button in the sidebar, like the other ARC+ apps.'],
     improved: ['The dashboard now uses the full width of the screen and the tool cards share the row evenly.', 'Brand text says ARC+ everywhere, including the sign-in captions.', 'The profile circle shows the ARC+ logo.'] },

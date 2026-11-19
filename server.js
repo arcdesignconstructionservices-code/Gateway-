@@ -168,9 +168,9 @@ async function sessionUser(req) {
   const u = await findUser(s.u); return u && u.active ? u : null;
 }
 // everyone can reach the dashboard; if a valid admin session cookie is present we know who it is
-/* OPEN MODE (default): no sign-in at all. Every visitor of the Gateway acts as the approver.
-   Set GATEWAY_OPEN=0 on the Gateway service to bring back the private approver link / admin sign-in. */
-const OPEN = process.env.GATEWAY_OPEN !== '0';
+/* SIGN-IN (default): visitors see the tools; approvers and admins sign in (/login) or use the private approver link.
+   OPEN MODE (opt-in): set GATEWAY_OPEN=1 on the Gateway service and every visitor acts as the approver, no sign-in. */
+const OPEN = process.env.GATEWAY_OPEN === '1';
 app.use(async (req, res, next) => { try { req.user = await sessionUser(req); } catch (e) { req.user = null; } if (!req.user && OPEN) req.user = { ...APPROVER_USER, open: true }; next(); });
 
 app.post('/api/login', async (req, res) => {
