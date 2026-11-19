@@ -33,6 +33,8 @@
       <label class="lg-field"><span>Password</span><input name="password" type="password" autocomplete="current-password" required></label>
       <button class="lg-btn" id="go">Sign in</button>
     </form>
+    <div class="lg-or2"><button type="button" class="lg-link" id="forgot">Forgot password?</button></div>
+    <div class="lg-okmsg" id="fnote" role="status" hidden></div>
     <div id="pOk" class="lg-pane lg-ok" hidden>
       <svg class="lg-check" viewBox="0 0 52 52" aria-hidden="true"><circle class="c" cx="26" cy="26" r="24"/><path class="t" d="M14 27l8 8 16-17"/></svg>
       <h1>Welcome back</h1><p class="lg-sub">Opening the Gateway...</p><div class="lg-bar"><i></i></div>
@@ -58,6 +60,18 @@
   setTimeout(function () { location.replace('/'); }, rm ? 450 : 2100);
 }
 const f = document.getElementById('f'), err = document.getElementById('err'), go = document.getElementById('go');
+const forgot = document.getElementById('forgot'), fnote = document.getElementById('fnote');
+/* one click: a reset link is emailed to the ARC email straight away */
+forgot.onclick = async () => {
+  err.textContent = ''; fnote.hidden = true; forgot.disabled = true; forgot.textContent = 'Sending…';
+  try {
+    const r = await fetch('/api/forgot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) { fnote.textContent = 'We emailed a request to change the password to ' + j.to + '. Open the link in that email (it works for 30 minutes).'; fnote.hidden = false; }
+    else err.textContent = j.error || 'Could not send the email.';
+  } catch (x) { err.textContent = 'Cannot reach the server. Check your connection.'; }
+  forgot.disabled = false; forgot.textContent = 'Forgot password?';
+};
 f.onsubmit = async e => {
   e.preventDefault(); err.textContent = ''; go.disabled = true;
   try {

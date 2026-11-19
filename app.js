@@ -302,6 +302,7 @@ const EV = {
   'request.created': ['Request received', ''], 'request.approved': ['Approved', 'ok'], 'request.denied': ['Declined', ''], 'request.revoked': ['Access revoked', 'bad'],
   'visitor.entered': ['Visitor entered', 'ok'], 'owner.signin': ['Owner signed in', 'ok'], 'owner.signin_failed': ['Failed sign-in', 'bad'], 'gateway.link_entry': ['Opened from Gateway', ''],
   'approver.link_opened': ['Approver device added', 'warn'], 'approver.link_failed': ['Bad approver link', 'bad'], 'gateway.signin': ['Gateway sign-in', 'ok'], 'gateway.signin_failed': ['Gateway sign-in failed', 'bad'],
+  'password.reset_requested': ['Password reset requested', 'warn'], 'password.reset_done': ['Password reset', 'warn'], 'password.changed': ['Password changed', 'warn'],
   'settings.changed': ['Settings changed', 'warn'], 'user.created': ['User created', ''], 'user.updated': ['User updated', ''], 'user.deleted': ['User deleted', 'bad']
 };
 async function renderSettings() {
@@ -327,6 +328,7 @@ async function renderSettings() {
       ${S.hasKey ? `<p class="muted">Open this private link once on another phone or computer and it can approve requests too. Anyone who has it can approve, so keep it private.</p>
       <div class="pwrow"><input readonly id="sLink" value="${esc(S.approverLink)}"><button class="sm" id="sCopy">Copy</button></div>
       <p class="muted">To sign out every approver device at once, change <b>APPROVER_KEY</b> on the Gateway service in Railway.</p>` : '<p class="muted">No approver link is configured (APPROVER_KEY is not set on the Gateway service).</p>'}</section>`}
+    <section class="setcard"><h2>Password</h2>${ME.role === 'admin' ? `<p class="muted">Change the password you sign in with. Forgot it? Use <b>Forgot password?</b> on the sign-in page: a link to change it is emailed to the ARC email.</p><button class="sm" id="sPw">Change password</button>` : `<p class="muted">Sign in with your admin account to change its password.</p>`}</section>
     ${S.open ? '' : `<section class="setcard"><h2>This device</h2>
       <p class="muted">Signed in as <b>${esc(ME.name)}</b>. Stopping removes this device&rsquo;s approver access until you open the private link again.</p>
       <button class="sm danger" id="sOut">Stop approving on this device</button></section>`}</div>`;
@@ -337,6 +339,7 @@ async function renderSettings() {
   $('#sAccept').onchange = e => put({ acceptRequests: e.target.checked }, e.target.checked ? 'Requests are being accepted.' : 'Requests are paused.');
   $('#sHours').onchange = e => put({ defaultHours: +e.target.value });
   if ($('#sCopy')) $('#sCopy').onclick = async () => { const i = $('#sLink'); try { await navigator.clipboard.writeText(i.value); note('Link copied.'); } catch (e) { i.select(); note('Press Ctrl+C to copy.'); } };
+  if ($('#sPw')) $('#sPw').onclick = passwordDialog;
   if ($('#sOut')) $('#sOut').onclick = async () => { if (!confirm('Stop approving on this device?')) return; try { await fetch('/api/logout', { method: 'POST' }); } catch (e) { } location.href = '/'; };
 }
 async function renderLogs() {

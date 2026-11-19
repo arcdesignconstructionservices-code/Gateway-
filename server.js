@@ -97,6 +97,7 @@ async function initDb() {
     await pool.query(`CREATE TABLE IF NOT EXISTS gw_log(
       id SERIAL PRIMARY KEY, ts TIMESTAMPTZ NOT NULL DEFAULT now(), action TEXT NOT NULL, actor TEXT NOT NULL DEFAULT '',
       email TEXT NOT NULL DEFAULT '', tool TEXT NOT NULL DEFAULT '', ip TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '')`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS gw_resets(token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, expires_at TIMESTAMPTZ NOT NULL, ip TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
     try { for (const r of (await pool.query('SELECT key, value FROM gw_settings')).rows) SETTINGS[r.key] = typeof r.value === 'string' ? JSON.parse(r.value) : r.value; } catch (e) { console.error('settings load failed:', e.message); }
     const n = (await pool.query('SELECT count(*)::int AS n FROM gw_users')).rows[0].n;
     if (!n && process.env.ADMIN_USER && process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD.length >= 8) {
@@ -235,7 +236,70 @@ app.post('/api/password', needUser, async (req, res) => {
   if (typeof next !== 'string' || next.length < 8) return res.status(400).json({ error: 'New password must be at least 8 characters.' });
   if (!(await checkPw(String(current || ''), req.user.password_hash))) return res.status(400).json({ error: 'Current password is wrong.' });
   await pool.query('UPDATE gw_users SET password_hash = $1 WHERE id = $2', [await hashPw(next), req.user.id]);
+  audit('password.changed', { actor: req.user.display_name || req.user.username, email: req.user.username, ip: req.ip, detail: 'changed from Settings' });
   res.json({ ok: true });
+});
+
+/* =====================  FORGOT / RESET PASSWORD  =====================
+   "Forgot password?" on the sign-in page emails a single-use link, valid 30 minutes, to the ARC email
+   (RESET_EMAIL, default arcdesignconstructionservices@gmail.com) at once; opening it lets the owner of that
+   account choose a new password. Needs SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS (same as Procurement).
+   The link always points at GATEWAY_PUBLIC_URL, never at the Host header of the request. */
+const RESET_TO = String(process.env.RESET_EMAIL || 'arcdesignconstructionservices@gmail.com').trim().toLowerCase();
+const PUBLIC_URL = String(process.env.GATEWAY_PUBLIC_URL || 'https://gateway.arcdesignconstructions.com').replace(/\/$/, '');
+const mailReady = () => !!process.env.SMTP_HOST;
+async function sendMail(o) {
+  const t = require('nodemailer').createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT) || 587, secure: Number(process.env.SMTP_PORT) === 465, auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined });
+  await t.sendMail({ from: process.env.MAIL_FROM || process.env.SMTP_USER, ...o });
+}
+const maskEmail = e => { const [n, d] = String(e).split('@'); return n.slice(0, 2) + '***@' + (d || ''); };
+const forgotHits = new Map(); let forgotAll = [];
+const resetTries = new Map();
+app.post('/api/forgot', async (req, res) => {
+  const ip = req.ip, now = Date.now();
+  const mine = (forgotHits.get(ip) || []).filter(t => now - t < 900000);
+  forgotAll = forgotAll.filter(t => now - t < 3600000);
+  if (mine.length >= 3 || forgotAll.length >= 8) return res.status(429).json({ error: 'A reset link was just sent. Check the ARC email, or try again in a few minutes.' });
+  if (!mailReady()) return res.status(501).json({ error: 'Email is not set up on the Gateway yet (SMTP settings are missing in Railway).' });
+  if (!pool || !dbReady) return res.status(503).json({ error: 'The database is not connected.' });
+  mine.push(now); forgotHits.set(ip, mine); forgotAll.push(now);
+  try {
+    const u = await findUser(RESET_TO);
+    audit('password.reset_requested', { actor: 'unknown', email: RESET_TO, ip, detail: u && u.active ? 'reset link emailed' : 'no active account uses this email' });
+    if (u && u.active) {
+      const token = crypto.randomBytes(32).toString('hex');
+      await pool.query('DELETE FROM gw_resets WHERE user_id = $1 OR expires_at < now()', [u.id]);
+      await pool.query("INSERT INTO gw_resets(token_hash, user_id, expires_at, ip) VALUES($1, $2, now() + interval '30 minutes', $3)", [sha(token), u.id, ip]);
+      const link = PUBLIC_URL + '/reset?token=' + token, when = new Date().toUTCString();
+      await sendMail({
+        to: RESET_TO, subject: 'ARC+ Gateway: request to change password',
+        text: 'Someone asked to change the ARC+ Gateway password.\n\nRequested: ' + when + '\nFrom IP address: ' + ip + '\n\nTo choose a new password, open this link (it works once and expires in 30 minutes):\n' + link + '\n\nIf this was not you, ignore this email: nothing changes unless the link is used.',
+        html: '<div style="font-family:Arial,sans-serif;font-size:14px;color:#14110d;max-width:520px"><h2 style="margin:0 0 12px">Change your ARC+ Gateway password</h2><p>Someone asked to change the ARC+ Gateway password.</p><p style="color:#6f685c;font-size:13px">Requested: ' + when + '<br>From IP address: ' + ip + '</p><p><a href="' + link + '" style="display:inline-block;background:#ffa203;color:#000;font-weight:bold;text-decoration:none;padding:11px 20px;border-radius:6px">Choose a new password</a></p><p style="color:#6f685c;font-size:13px">The link works once and expires in 30 minutes. If this was not you, ignore this email: nothing changes unless the link is used.</p></div>'
+      });
+    }
+    res.json({ ok: true, to: maskEmail(RESET_TO) });
+  } catch (e) { console.error('forgot failed:', e.message); res.status(502).json({ error: 'Could not send the email. Check the Gateway email settings.' }); }
+});
+const validReset = async token => {
+  if (typeof token !== 'string' || !/^[0-9a-f]{64}$/.test(token) || !pool || !dbReady) return null;
+  const r = await pool.query('SELECT r.token_hash, r.user_id, u.username FROM gw_resets r JOIN gw_users u ON u.id = r.user_id WHERE r.token_hash = $1 AND r.expires_at > now() AND u.active', [sha(token)]);
+  return r.rows[0] || null;
+};
+app.get('/api/reset/check', async (req, res) => { try { res.json({ valid: !!(await validReset(String(req.query.token || ''))) }); } catch (e) { res.json({ valid: false }); } });
+app.post('/api/reset', async (req, res) => {
+  const ip = req.ip, now = Date.now(), t = (resetTries.get(ip) || []).filter(x => now - x < 600000);
+  if (t.length >= 10) return res.status(429).json({ error: 'Too many attempts. Try again in a few minutes.' });
+  t.push(now); resetTries.set(ip, t);
+  const { token, password } = req.body || {};
+  if (typeof password !== 'string' || password.length < 8) return res.status(400).json({ error: 'The new password must be at least 8 characters.' });
+  try {
+    const r = await validReset(token);
+    if (!r) return res.status(400).json({ error: 'This link has expired or was already used. Go back and choose "Forgot password?" again.' });
+    await pool.query('UPDATE gw_users SET password_hash = $1 WHERE id = $2', [await hashPw(password), r.user_id]);
+    await pool.query('DELETE FROM gw_resets WHERE user_id = $1', [r.user_id]);
+    audit('password.reset_done', { actor: 'password reset link', email: r.username, ip, detail: 'password changed with the emailed link' });
+    res.json({ ok: true });
+  } catch (e) { console.error('reset failed:', e.message); res.status(500).json({ error: 'Could not change the password. Try again.' }); }
 });
 
 /* =====================  ACCESS REQUESTS  ===================== */

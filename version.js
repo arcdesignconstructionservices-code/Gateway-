@@ -5,8 +5,11 @@
      2. set APP_VERSION to the same version (and package.json "version")
    Entry shape:  { v, date, title, new:[...], improved:[...], fixed:[...] }
    ============================================================ */
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 const APP_CHANGELOG = [
+  { v: '1.6.0', date: '2026-11-19', title: 'Change password and Forgot password',
+    new: ['Change password in Settings.', 'Forgot password? on the sign-in page: one click emails a link to the ARC email to choose a new password. The link works once and expires in 30 minutes.'],
+    improved: ['Password changes and resets are recorded in the activity log.'] },
   { v: '1.5.0', date: '2026-11-19', title: 'Sign in and sign out are back',
     new: ['Sign in button in the header for admins and approvers, and Sign out once you are in.', 'A fourth card on the dashboard: always at least four, with a \u201CMore tools coming\u201D tile when there are fewer tools.'],
     improved: ['Visitors see the tools and open them as before; Settings, Access requests and the activity log need an approver or admin.'] },
