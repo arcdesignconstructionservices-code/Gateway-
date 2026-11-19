@@ -55,7 +55,7 @@ function renderTools(mine) {
   const list = myTools().filter(t => (!mine || isFav(t.id)) && match(t));
   $('#view').innerHTML = `<h1>${mine ? 'My Tools' : 'Your Tools'}</h1>
     <p class="sub">${mine ? 'Tools you starred. Click the star on any card to add or remove it.' : 'Tools you can open right now. Each one launches in a new tab.'}</p>
-    ${list.length ? `<div class="grid">${list.map(card).join('')}</div>`
+    ${list.length ? `<div class="grid" style="--n:${list.length}">${list.map(card).join('')}</div>`
       : `<div class="empty">${mine && !query ? 'No favourites yet — star a tool on the dashboard.' : (!myTools().length ? 'You have no tools yet. Ask a Super Admin to give you access.' : 'No tools match your search.')}</div>`}`;
   $('#view').querySelectorAll('[data-fav]').forEach(b => b.onclick = () => {
     const id = b.dataset.fav; favs = isFav(id) ? favs.filter(x => x !== id) : [...favs, id]; saveFavs(); render();
@@ -109,7 +109,7 @@ function renderDashboard() {
       ${appr ? kpi('kPend', 'Waiting', 'requests to review', 0, 'warm') + kpi('kApp', 'Approved', 'in the last 24 h', 0) + kpi('kIn', 'Entries', 'in the last 24 h', 0) + kpi('kFail', 'Failed sign-ins', 'in the last 24 h', 0, 'bad') : ''}
     </div>
     <div class="sect"><h2>Your tools</h2><span class="muted">Each one opens in a new tab.</span></div>
-    ${tools.length ? `<div class="grid">${tools.map((t, i) => card(t).replace('<article class="card"', `<article class="card rise" style="--i:${i}"`).replace(/<span class="status([^"]*)"><i><\/i>(Active|Coming soon)<\/span>/, (m, c, w) => w === 'Active' ? `<span class="status" data-st="${esc(t.id)}"><i></i>Checking…</span>` : m)).join('')}</div>`
+    ${tools.length ? `<div class="grid" style="--n:${tools.length}">${tools.map((t, i) => card(t).replace('<article class="card"', `<article class="card rise" style="--i:${i}"`).replace(/<span class="status([^"]*)"><i><\/i>(Active|Coming soon)<\/span>/, (m, c, w) => w === 'Active' ? `<span class="status" data-st="${esc(t.id)}"><i></i>Checking…</span>` : m)).join('')}</div>`
       : `<div class="empty">${!myTools().length ? 'You have no tools yet.' : 'No tools match your search.'}</div>`}
 `;
   $('#view').querySelectorAll('[data-fav]').forEach(b => b.onclick = () => { const id = b.dataset.fav; favs = isFav(id) ? favs.filter(x => x !== id) : [...favs, id]; saveFavs(); b.classList.toggle('on', isFav(id)); });
