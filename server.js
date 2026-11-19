@@ -82,6 +82,19 @@ const pool = process.env.DATABASE_URL ? (() => {
 let dbReady = false;
 // Settings an approver can change on the Gateway's Settings page (saved in Postgres)
 const SETTINGS = { acceptRequests: true, defaultHours: [1, 12, 24, 168].includes(ACCESS_HOURS) ? ACCESS_HOURS : 12 };
+/* RECOVERY (one time): with ADMIN_PASSWORD_RESET=1 plus ADMIN_USER and ADMIN_PASSWORD (8+ chars) on the Gateway
+   service, the Gateway sets that admin's password at start-up (and creates the account if it is missing).
+   Anyone who can set Railway variables can do this. REMOVE ADMIN_PASSWORD_RESET afterwards, otherwise every
+   restart puts that password back. */
+async function adminRecovery(n) {
+  if (process.env.ADMIN_PASSWORD_RESET !== '1' || !n) return;
+  if (!process.env.ADMIN_USER || !process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD.length < 8) { console.warn('ADMIN_PASSWORD_RESET=1 ignored: set ADMIN_USER and an ADMIN_PASSWORD of 8+ characters.'); return; }
+  const un = process.env.ADMIN_USER.toLowerCase(), ph = await hashPw(process.env.ADMIN_PASSWORD);
+  const up = await pool.query("UPDATE gw_users SET password_hash = $1, role = 'admin', active = true WHERE username = $2 RETURNING id", [ph, un]);
+  if (!up.rows.length) await pool.query('INSERT INTO gw_users(username, display_name, password_hash, role, tools) VALUES($1,$2,$3,$4,$5)', [un, 'Super Admin', ph, 'admin', JSON.stringify(['*'])]);
+  console.log('Admin "' + un + '" password set from ADMIN_PASSWORD (ADMIN_PASSWORD_RESET=1). Remove ADMIN_PASSWORD_RESET now.');
+  try { await pool.query('INSERT INTO gw_log(action, actor, email, detail) VALUES($1,$2,$3,$4)', ['password.reset_done', 'Railway variable', un, 'admin password set from ADMIN_PASSWORD at start-up']); } catch (e) { }
+}
 async function initDb() {
   if (!pool) { console.warn('No DATABASE_URL — users and access requests need a database.'); return; }
   try {
@@ -105,6 +118,7 @@ async function initDb() {
         [process.env.ADMIN_USER.toLowerCase(), 'Super Admin', await hashPw(process.env.ADMIN_PASSWORD), 'admin', JSON.stringify(['*'])]);
       console.log('Created first Super Admin "' + process.env.ADMIN_USER.toLowerCase() + '".');
     } else if (!n) console.warn('No Gateway users yet — set ADMIN_USER and ADMIN_PASSWORD (8+ chars) so someone can approve access requests.');
+    await adminRecovery(n);
     dbReady = true; console.log('PostgreSQL connected — gw_users, gw_access ready.');
   } catch (e) { dbReady = false; console.error('DB init failed:', e.message); setTimeout(initDb, 5000); }
 }
