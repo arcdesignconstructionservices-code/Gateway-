@@ -5,8 +5,10 @@
      2. set APP_VERSION to the same version (and package.json "version")
    Entry shape:  { v, date, title, new:[...], improved:[...], fixed:[...] }
    ============================================================ */
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.7.1';
 const APP_CHANGELOG = [
+  { v: '1.7.1', date: '2026-11-19', title: 'Opening animation',
+    improved: ['Pressing Open App now pulses the card, spreads a ripple from your click, turns the button into Opening… and shows a message while the app opens in its new tab.', 'The app then greets you with its welcome animation (logo, progress bar and an orange wipe) when it opens from the Gateway.'] },
   { v: '1.7.0', date: '2026-11-19', title: 'Notifications in the bell',
     new: ['The bell now lists what happened: password changes and resets, sign-ins and failed sign-ins, approvals, declines and revocations, user and settings changes.', 'New events appear live with a short message and a number on the bell; opening the bell marks them as read.'],
     improved: ['Changing your password shows a message in the corner instead of a browser pop-up.', 'Refresh button in the header: a hard refresh that fetches everything fresh.'] },

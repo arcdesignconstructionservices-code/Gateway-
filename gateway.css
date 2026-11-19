@@ -428,3 +428,25 @@ dialog.ver::backdrop{background:rgba(0,0,0,.62);backdrop-filter:blur(5px)}
 .notifdd .nfoot{display:block;padding:11px 16px;text-align:center;font-size:13px;font-weight:700;color:var(--o3);text-decoration:none;background:var(--bg)}
 .notifdd .nfoot:hover{text-decoration:underline}
 #refreshBtn.spin svg{animation:rspin .8s linear infinite}@keyframes rspin{to{transform:rotate(360deg)}}
+
+/* ===== Opening animation (Open App) ===== */
+.card.launching{animation:lpulse 1.3s cubic-bezier(.2,.7,.2,1);border-color:var(--o)!important}
+@keyframes lpulse{0%{transform:none;box-shadow:0 0 0 0 rgba(255,162,3,.55)}25%{transform:translateY(-6px) scale(1.018);box-shadow:0 0 0 10px rgba(255,162,3,.22),0 24px 44px -18px rgba(255,162,3,.6)}100%{transform:none;box-shadow:0 0 0 22px rgba(255,162,3,0)}}
+.card.launching .tico{animation:lspinico .9s cubic-bezier(.3,1.4,.5,1)}
+@keyframes lspinico{0%{transform:none}50%{transform:rotate(-14deg) scale(1.28)}100%{transform:none}}
+.open{position:relative;overflow:hidden}
+.open .rip,a .rip{position:absolute;border-radius:50%;background:rgba(255,162,3,.5);transform:scale(0);animation:ripple .75s ease-out forwards;pointer-events:none}
+@keyframes ripple{to{transform:scale(1);opacity:0}}
+.open.busy{background:linear-gradient(90deg,#0a0a0a 0%,#2a2218 50%,#0a0a0a 100%);background-size:200% 100%;animation:lshim 1s linear infinite;pointer-events:none}
+@keyframes lshim{to{background-position:-200% 0}}
+.lspin{width:15px;height:15px;border:2px solid rgba(255,255,255,.3);border-top-color:var(--o);border-radius:50%;display:inline-block;animation:rspin .7s linear infinite}
+.launchtoast{position:fixed;left:50%;bottom:28px;z-index:80;transform:translateX(-50%);display:flex;align-items:center;gap:12px;background:#0a0a0a;color:#fff;padding:12px 18px 16px;border-radius:12px;border-bottom:3px solid var(--o);box-shadow:0 24px 50px -16px rgba(0,0,0,.6);animation:ltin .35s cubic-bezier(.2,.9,.3,1.2) both;min-width:260px;overflow:hidden}
+.launchtoast.out{animation:ltout .35s ease forwards}
+@keyframes ltin{from{opacity:0;transform:translate(-50%,18px) scale(.96)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes ltout{to{opacity:0;transform:translate(-50%,10px)}}
+.launchtoast img{width:34px;height:34px;object-fit:contain;animation:awpop2 .6s cubic-bezier(.3,1.4,.5,1) both}
+@keyframes awpop2{from{opacity:0;transform:scale(.4) rotate(-10deg)}to{opacity:1;transform:none}}
+.launchtoast b{display:block;font-size:14px}.launchtoast small{color:#a8a299;font-size:12px}
+.launchtoast .lbar{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.12)}.launchtoast .lbar b{display:block;height:100%;width:0;background:var(--o);animation:lfill 1.9s ease-out forwards}
+@keyframes lfill{to{width:100%}}
+@media (prefers-reduced-motion:reduce){.launchtoast,.launchtoast img,.card.launching,.card.launching .tico{animation:none!important}}

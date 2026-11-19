@@ -448,7 +448,24 @@ function setTheme(t, keep) { document.documentElement.dataset.theme = t; if (kee
 (function () { let t = 'light'; try { t = localStorage.getItem(KEY + '-theme-choice') || 'light'; } catch (e) { } setTheme(t); })();
 $('#themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark', true);
 $('#pwBtn').onclick = passwordDialog;
-/* Refresh button: a hard refresh. Re-downloads the page and its scripts and styles (ignoring what the browser
+/* Opening animation: pressing Open App (card, banner or sidebar) pulses the card, spreads a ripple from the click,
+   turns the button into "Opening…" and shows a message while the app opens in its new tab. */
+document.addEventListener('click', e => {
+  const a = e.target.closest && e.target.closest('a[href^="/launch/"]'); if (!a || a.classList.contains('disabled') || reduced()) return;
+  const t = GATEWAY_TOOLS.find(x => x.id === a.getAttribute('href').split('/').pop()), name = t ? t.name : 'the app';
+  const card = a.closest('.card');
+  if (card) {
+    card.classList.remove('launching'); void card.offsetWidth; card.classList.add('launching'); setTimeout(() => card.classList.remove('launching'), 1900);
+    const r = a.getBoundingClientRect(), rip = document.createElement('span'), s = Math.max(r.width, r.height) * 2;
+    rip.className = 'rip'; rip.style.cssText = `width:${s}px;height:${s}px;left:${e.clientX - r.left - s / 2}px;top:${e.clientY - r.top - s / 2}px`;
+    a.appendChild(rip); setTimeout(() => rip.remove(), 800);
+    if (a.classList.contains('open') && !a.classList.contains('busy')) { const old = a.innerHTML; a.classList.add('busy'); a.innerHTML = '<i class="lspin"></i> Opening…'; setTimeout(() => { a.classList.remove('busy'); a.innerHTML = old; }, 1900); }
+  }
+  const old = document.getElementById('launchToast'); if (old) old.remove();
+  const el = document.createElement('div'); el.id = 'launchToast'; el.className = 'launchtoast';
+  el.innerHTML = `<img src="logo.png" alt=""><div><b>Opening ${esc(name)}</b><small>It opens in a new tab&hellip;</small></div><i class="lbar"><b></b></i>`;
+  document.body.appendChild(el); setTimeout(() => el.classList.add('out'), 2000); setTimeout(() => el.remove(), 2400);
+});/* Refresh button: a hard refresh. Re-downloads the page and its scripts and styles (ignoring what the browser
    kept), clears any cached copies, then reloads. */
 $('#refreshBtn').onclick = async () => {
   const b = $('#refreshBtn'); b.classList.add('spin'); b.disabled = true;

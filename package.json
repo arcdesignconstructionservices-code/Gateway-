@@ -1,6 +1,6 @@
 {
   "name": "arc-gateway",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "private": true,
   "description": "ARC+ Gateway - sign-in and launcher for the ARC+ tools",
   "main": "server.js",
